@@ -2,239 +2,192 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Course Chatbot</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SPX102 Coach Ross</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <!-- Tailwind CSS for modern styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
   <style>
     :root {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-        sans-serif;
-      color-scheme: light dark;
+      font-family: 'Inter', sans-serif;
+    }
+    
+    /* Custom Scrollbar */
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+    }
+    .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+    
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: rgba(30, 41, 59, 0.5);
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background-color: #475569;
+      border-radius: 20px;
     }
 
-    body {
-      margin: 0;
-      padding: 0;
-      display: flex;
-      justify-content: center;
-      align-items: stretch;
-      height: 100vh;
-      background: #0f172a;
-      color: #e5e7eb;
+    /* Message Bubbles */
+    .msg-user {
+      border-radius: 18px 18px 4px 18px;
+    }
+    .msg-bot {
+      border-radius: 18px 18px 18px 4px;
     }
 
-    .chat-shell {
-      max-width: 800px;
-      width: 100%;
-      margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      border-radius: 12px;
-      border: 1px solid #1f2937;
-      background: radial-gradient(circle at top, #1f2937, #020617);
-      overflow: hidden;
-    }
-
-    header {
-      padding: 0.75rem 1rem;
-      border-bottom: 1px solid #1f2937;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      background: rgba(15, 23, 42, 0.95);
-      backdrop-filter: blur(8px);
-    }
-
-    header h1 {
-      font-size: 1rem;
-      margin: 0;
-    }
-
-    header span {
-      font-size: 0.75rem;
-      color: #9ca3af;
-    }
-
-    .status-dot {
+    /* Bounce animation for dots */
+    .typing-dot {
+      animation: bounce 1.4s infinite ease-in-out both;
+      background-color: #94a3b8; 
       width: 8px;
       height: 8px;
-      border-radius: 999px;
-      background: #22c55e;
-      box-shadow: 0 0 6px #22c55e;
-    }
-
-    #chat-log {
-      flex: 1;
-      padding: 1rem;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      scroll-behavior: smooth;
-    }
-
-    .msg {
-      max-width: 90%;
-      padding: 0.5rem 0.75rem;
-      border-radius: 0.75rem;
-      font-size: 0.9rem;
-      line-height: 1.4;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-    }
-
-    .msg.user {
-      margin-left: auto;
-      background: #4f46e5;
-      color: white;
-      border-bottom-right-radius: 0.15rem;
-    }
-
-    .msg.assistant {
-      margin-right: auto;
-      background: #111827;
-      border: 1px solid #1f2937;
-      border-bottom-left-radius: 0.15rem;
-    }
-
-    .msg.system {
-      margin: 0 auto;
-      background: #0b1120;
-      border-radius: 999px;
-      padding-inline: 1rem;
-      font-size: 0.75rem;
-      color: #9ca3af;
-    }
-
-    form {
-      border-top: 1px solid #1f2937;
-      padding: 0.75rem;
-      background: rgba(15, 23, 42, 0.98);
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    textarea {
-      resize: none;
-      min-height: 60px;
-      max-height: 160px;
-      padding: 0.5rem 0.75rem;
-      border-radius: 0.75rem;
-      border: 1px solid #374151;
-      background: #020617;
-      color: #e5e7eb;
-      font-family: inherit;
-      font-size: 0.9rem;
-      outline: none;
-    }
-
-    textarea:focus {
-      border-color: #6366f1;
-      box-shadow: 0 0 0 1px #4f46e566;
-    }
-
-    .form-row {
-      display: flex;
-      justify-content: space-between;
-      gap: 0.5rem;
-      align-items: center;
-    }
-
-    button {
-      border: none;
-      border-radius: 999px;
-      padding: 0.4rem 1.2rem;
-      font-size: 0.85rem;
-      cursor: pointer;
-      background: #4f46e5;
-      color: #e5e7eb;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-    }
-
-    button:disabled {
-      opacity: 0.6;
-      cursor: default;
-    }
-
-    .hint {
-      font-size: 0.7rem;
-      color: #9ca3af;
-    }
-
-    .error {
-      font-size: 0.8rem;
-      color: #f97373;
-      max-width: 260px;
+      border-radius: 50%;
       display: inline-block;
+      margin: 0 2px;
+    }
+    
+    .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+    .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+    
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0); }
+      40% { transform: scale(1); }
+    }
+
+    /* Gradient Text */
+    .text-gradient {
+      background: linear-gradient(to right, #818cf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
   </style>
 </head>
-<body>
-  <div class="chat-shell">
-    <header>
-      <div class="status-dot"></div>
-      <div>
-        <h1>SPX102 Coaching Chatbot</h1>
-        <span>Answers based only on the SPX102 INTRODUCTION TO COACHING notes</span>
-      </div>
-    </header>
+<body class="bg-slate-950 text-slate-200 h-screen flex flex-col overflow-hidden selection:bg-indigo-500 selection:text-white">
 
-    <div id="chat-log">
-      <div class="msg system">
-        Welcome! I’m your assistant for SPX102 INTRODUCTION TO COACHING. Ask me
-        anything about the course concepts in the provided notes.
+  <!-- Header -->
+  <header class="flex-none bg-slate-900/80 backdrop-blur-md border-b border-slate-800 p-4 flex items-center gap-4 z-20 shadow-lg">
+    <div class="relative group cursor-pointer">
+      <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full blur opacity-50 group-hover:opacity-100 transition duration-500"></div>
+      <img 
+        src="https://www.rehabtools.org/uploads/5/4/2/3/54237171/ross-clark_orig.jpg" 
+        alt="Ross Clark" 
+        class="relative w-12 h-12 rounded-full object-cover border-2 border-slate-900"
+        onerror="this.src='https://ui-avatars.com/api/?name=Ross+Clark&background=6366f1&color=fff'"
+      />
+      <div class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-slate-900 rounded-full animate-pulse"></div>
+    </div>
+    
+    <div class="flex-1 min-w-0">
+      <h1 class="text-lg font-semibold text-white truncate flex items-center gap-2">
+        Dr. Ross Clark
+        <span class="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-medium border border-indigo-500/20">AI Coach</span>
+      </h1>
+      <p class="text-xs text-slate-400 truncate">SPX102 Introduction to Coaching • Always Online</p>
+    </div>
+    
+    <!-- Info Button -->
+    <button onclick="alert('I can only answer questions based on the SPX102 Notes.')" class="p-2 text-slate-400 hover:text-white transition-colors rounded-full hover:bg-slate-800">
+      <i data-lucide="info" class="w-5 h-5"></i>
+    </button>
+  </header>
+
+  <!-- Chat Log -->
+  <main id="chat-log" class="flex-1 overflow-y-auto custom-scroll p-4 space-y-6 scroll-smooth">
+    
+    <!-- Welcome Message -->
+    <div class="flex gap-4">
+      <img src="https://www.rehabtools.org/uploads/5/4/2/3/54237171/ross-clark_orig.jpg" class="w-10 h-10 rounded-full object-cover border border-slate-700 flex-none self-end mb-1" alt="Bot">
+      <div class="space-y-1 max-w-[85%]">
+        <div class="text-xs text-slate-500 ml-1">Ross Clark</div>
+        <div class="msg-bot bg-slate-800 border border-slate-700 p-4 text-sm leading-relaxed shadow-sm">
+          <p>Hello! I'm your AI assistant for <span class="text-indigo-400 font-semibold">SPX102 INTRODUCTION TO COACHING</span>.</p>
+          <br>
+          <p>I can help you understand coaching pedagogy, training principles, or LTAD based on our course notes. What's on your mind?</p>
+        </div>
       </div>
     </div>
 
-    <form id="chat-form">
-      <textarea
-        id="user-input"
-        placeholder="Ask about SPX102 coaching concepts, examples, or how topics connect..."
-      ></textarea>
-      <div class="form-row">
-        <div class="hint">
-          I can only answer questions based on the SPX102 INTRODUCTION TO COACHING notes I was given.
-        </div>
-        <div>
-          <span id="error" class="error"></span>
-          <button type="submit" id="send-btn">
-            Send
-            <span id="sending-spinner" style="display: none">…</span>
-          </button>
-        </div>
+  </main>
+
+  <!-- Typing Indicator (Hidden by default) -->
+  <div id="typing-indicator" class="hidden px-4 pb-2">
+    <div class="flex gap-4">
+      <img src="https://www.rehabtools.org/uploads/5/4/2/3/54237171/ross-clark_orig.jpg" class="w-8 h-8 rounded-full object-cover border border-slate-700 flex-none self-end opacity-70" alt="Bot">
+      <div class="msg-bot bg-slate-800/50 border border-slate-700/50 p-3 rounded-2xl rounded-bl-none w-16 flex items-center justify-center h-10">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
       </div>
-    </form>
+    </div>
   </div>
 
+  <!-- Input Area -->
+  <footer class="flex-none p-4 bg-slate-900/90 backdrop-blur-lg border-t border-slate-800">
+    <form id="chat-form" class="max-w-4xl mx-auto relative flex items-end gap-2">
+      
+      <div class="relative flex-1 bg-slate-800/50 border border-slate-700 rounded-2xl focus-within:ring-2 focus-within:ring-indigo-500/50 focus-within:border-indigo-500 focus-within:bg-slate-800 transition-all duration-300">
+        <textarea
+          id="user-input"
+          rows="1"
+          class="w-full bg-transparent text-white placeholder-slate-500 px-4 py-3.5 outline-none resize-none overflow-hidden max-h-32 text-sm"
+          placeholder="Ask a question about coaching..."
+          oninput="this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'"></textarea>
+      </div>
+
+      <button 
+        type="submit" 
+        id="send-btn" 
+        class="flex-none h-[50px] w-[50px] bg-indigo-600 hover:bg-indigo-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">
+        <i data-lucide="send" class="w-5 h-5 ml-0.5"></i>
+      </button>
+
+    </form>
+    <div class="text-center mt-2">
+       <span id="error" class="text-xs text-red-400 font-medium"></span>
+       <span class="text-[10px] text-slate-600">I can only answer questions based on the SPX102 INTRODUCTION TO COACHING notes I was given.</span>
+    </div>
+  </footer>
+
   <script>
-    const API_URL = "/.netlify/functions/openrouter-chat";
+    // Initialize Icons
+    lucide.createIcons();
+
+    const API_URL = "/.netlify/functions/openrouter-chat"; // Original Backend URL
     const chatLog = document.getElementById("chat-log");
     const form = document.getElementById("chat-form");
     const textarea = document.getElementById("user-input");
     const errorSpan = document.getElementById("error");
     const sendBtn = document.getElementById("send-btn");
-    const spinner = document.getElementById("sending-spinner");
+    const typingIndicator = document.getElementById("typing-indicator");
 
-    // Full message history (including system prompt)
+    // Full message history
     let messages = [];
 
+    // --- KNOWLEDGE BASE (Restored) ---
     const knowledgeBase = `
 ## Section 1: Coaching Pedagogy and Methodology
 
 **1.1 The Role of the Coach**
-*   **Primary Goal:** Enhance performance (executing a skill in a specific context) [1], [2].
-*   **Key Functions:** Teaching, facilitating practice, providing feedback, and acting as a guide/facilitator rather than just an explicit instructor [2], [3].
-*   **Modern vs. Old School:** Modern coaching focuses on athlete problem-solving and games-based approaches, whereas "old school" (20th century) focused on isolation drills and explicit instruction [3].
-*   **Frameworks:** Coaching must adjust for Specificity (training specific to the sport) and Individuality (adjusting for athlete needs) [4].
+* **Primary Goal:** Enhance performance (executing a skill in a specific context) [1], [2].
+* **Key Functions:** Teaching, facilitating practice, providing feedback, and acting as a guide/facilitator rather than just an explicit instructor [2], [3].
+* **Modern vs. Old School:** Modern coaching focuses on athlete problem-solving and games-based approaches, whereas "old school" (20th century) focused on isolation drills and explicit instruction [3].
+* **Frameworks:** Coaching must adjust for Specificity (training specific to the sport) and Individuality (adjusting for athlete needs) [4].
 
 **1.2 Learning Modalities**
-*   **Visual:** Prefers graphs, diagrams, demonstrations [5].
-*   **Auditory:** Prefers listening to instructions [5].
-*   **Kinesthetic:** Prefers to learn by doing/feeling body positions [5].
-*   **Reader/Writer:** Prefers taking notes [5].
-*   **Multimodal:** Most learners prefer a combination of methods [5].
+* **Visual:** Prefers graphs, diagrams, demonstrations [5].
+* **Auditory:** Prefers listening to instructions [5].
+* **Kinesthetic:** Prefers to learn by doing/feeling body positions [5].
+* **Reader/Writer:** Prefers taking notes [5].
+* **Multimodal:** Most learners prefer a combination of methods [5].
 
 **1.3 The Learning Process Loop**
 1.  **Instruction:** Verbal communication [6].
@@ -244,87 +197,87 @@
 5.  **Retention:** Consolidating the skill [7].
 
 **1.4 Instruction and Demonstration**
-*   **Verbal Tips:** Use short, simple keywords; avoid information overload; use a "Sandwich approach" for feedback (Positive-Constructive-Positive) [8]. Avoid pointing out "what not to do" [9].
-*   **Demonstration:** Must be performed correctly to avoid negative motor programs [9]. Show at normal speed first to demonstrate timing, then break down if needed [10].
+* **Verbal Tips:** Use short, simple keywords; avoid information overload; use a "Sandwich approach" for feedback (Positive-Constructive-Positive) [8]. Avoid pointing out "what not to do" [9].
+* **Demonstration:** Must be performed correctly to avoid negative motor programs [9]. Show at normal speed first to demonstrate timing, then break down if needed [10].
 
 **1.5 Feedback Types**
-*   **Task Intrinsic:** Sensory info available to the athlete naturally (visual, proprioceptive) [11].
-*   **Augmented:** Info provided by the coach [12].
-    *   **Knowledge of Results (KR):** Outcome (e.g., "Did it go in?") [12].
-    *   **Knowledge of Performance (KP):** Technical info (e.g., "Knee angle was wrong") [12].
+* **Task Intrinsic:** Sensory info available to the athlete naturally (visual, proprioceptive) [11].
+* **Augmented:** Info provided by the coach [12].
+    * **Knowledge of Results (KR):** Outcome (e.g., "Did it go in?") [12].
+    * **Knowledge of Performance (KP):** Technical info (e.g., "Knee angle was wrong") [12].
 
 **1.6 Games-Based Learning (GBL) & Session Design**
-*   **Dynamic Systems Theory:** Skills emerge from the interaction of Task, Performer, and Environment constraints [13].
-*   **Modification Frameworks:**
-    *   **TREE:** Teaching style, Rules, Environment, Equipment [14].
-    *   **CHANGE IT:** Coaching style, How to score, Area, Numbers, Game rules, Equipment, Inclusion, Time [14], [15].
-*   **Teaching Games for Understanding (TGfU):** Uses modified games to teach skills/tactics under pressure (e.g., 3v3 soccer on a small pitch) [15].
-*   **Technique Variability:** There is no single "perfect" technique; variability is normal. Only modify technique for injury prevention or clear performance enhancement [16], [17].
+* **Dynamic Systems Theory:** Skills emerge from the interaction of Task, Performer, and Environment constraints [13].
+* **Modification Frameworks:**
+    * **TREE:** Teaching style, Rules, Environment, Equipment [14].
+    * **CHANGE IT:** Coaching style, How to score, Area, Numbers, Game rules, Equipment, Inclusion, Time [14], [15].
+* **Teaching Games for Understanding (TGfU):** Uses modified games to teach skills/tactics under pressure (e.g., 3v3 soccer on a small pitch) [15].
+* **Technique Variability:** There is no single "perfect" technique; variability is normal. Only modify technique for injury prevention or clear performance enhancement [16], [17].
 
 **1.7 Warm-Up Design**
-*   **Effectiveness:** Dynamic warm-ups improve sprint/jump performance by 7–8% [18].
-*   **Caution:** Static stretching can reduce max strength by ~30% for up to 20 minutes [19].
-*   **Team Sport Formula:** 1. Range of Motion (low load) -> 2. Dynamic component (3-5 min) -> 3. Skill warm-up -> 4. Small-sided game [19].
+* **Effectiveness:** Dynamic warm-ups improve sprint/jump performance by 7–8% [18].
+* **Caution:** Static stretching can reduce max strength by ~30% for up to 20 minutes [19].
+* **Team Sport Formula:** 1. Range of Motion (low load) -> 2. Dynamic component (3-5 min) -> 3. Skill warm-up -> 4. Small-sided game [19].
 
 ---
 
 ## Section 2: Officiating
 
 **2.1 Role of the Official**
-*   **Definition:** Controls gameplay by applying laws/rules to ensure fair play [20].
-*   **Three Key Duties:** Control the game, Decision-making (fractions of a second), Communication (explaining decisions) [21].
-*   **Categories:**
-    *   **Interactors:** High physical/interaction demands (e.g., Soccer referee) [22].
-    *   **Monitors:** Low physical, high cue processing (e.g., Volleyball ref) [22].
-    *   **Reactors:** Low interaction/movement (e.g., Tennis line judge) [22].
-*   **Decision-Making Process:** Stimulus -> Perception -> Categorization -> Memory Access -> Integration -> Response [23], [24].
+* **Definition:** Controls gameplay by applying laws/rules to ensure fair play [20].
+* **Three Key Duties:** Control the game, Decision-making (fractions of a second), Communication (explaining decisions) [21].
+* **Categories:**
+    * **Interactors:** High physical/interaction demands (e.g., Soccer referee) [22].
+    * **Monitors:** Low physical, high cue processing (e.g., Volleyball ref) [22].
+    * **Reactors:** Low interaction/movement (e.g., Tennis line judge) [22].
+* **Decision-Making Process:** Stimulus -> Perception -> Categorization -> Memory Access -> Integration -> Response [23], [24].
 
 ---
 
 ## Section 3: Talent Identification and Testing
 
 **3.1 Types of Talent ID**
-*   **Talent Selection:** Choosing athletes already participating in the sport (e.g., draft combines) [25].
-*   **Talent Detection:** Recruiting athletes from outside the sport based on physical attributes (e.g., long legs for rowing) [25].
+* **Talent Selection:** Choosing athletes already participating in the sport (e.g., draft combines) [25].
+* **Talent Detection:** Recruiting athletes from outside the sport based on physical attributes (e.g., long legs for rowing) [25].
 
 **3.2 Testing Principles**
-*   **Reliability:** Consistency of measurement (reproducibility) [26].
-*   **Validity:** Accuracy of measurement (measuring what it intends to measure) [27].
+* **Reliability:** Consistency of measurement (reproducibility) [26].
+* **Validity:** Accuracy of measurement (measuring what it intends to measure) [27].
 
 **3.3 Kinanthropometry**
-*   **Definition:** Measuring body segment lengths, girths, and ratios [28].
-*   **Peak Height Velocity (PHV):** The period of fastest growth during puberty; requires load management to prevent injury [29].
-*   **Bone Density:** Critical for preventing stress fractures; measured via DEXA [29].
+* **Definition:** Measuring body segment lengths, girths, and ratios [28].
+* **Peak Height Velocity (PHV):** The period of fastest growth during puberty; requires load management to prevent injury [29].
+* **Bone Density:** Critical for preventing stress fractures; measured via DEXA [29].
 
 ---
 
 ## Section 4: Training Principles and Capacities
 
 **4.1 Core Principles**
-*   **Overload:** Manipulating load to stimulate adaptation [30].
-*   **FIT:** Frequency, Intensity, Time/Duration, Type [30].
-*   **Specificity:** Adaptations are specific to the training mode [31].
-*   **Individuality:** Athletes adapt differently based on age, genetics, and history [31].
-*   **Reversibility:** "Use it or lose it" [31].
-*   **Super Compensation:** The cycle of fatigue followed by recovery and improved capacity [32].
+* **Overload:** Manipulating load to stimulate adaptation [30].
+* **FIT:** Frequency, Intensity, Time/Duration, Type [30].
+* **Specificity:** Adaptations are specific to the training mode [31].
+* **Individuality:** Athletes adapt differently based on age, genetics, and history [31].
+* **Reversibility:** "Use it or lose it" [31].
+* **Super Compensation:** The cycle of fatigue followed by recovery and improved capacity [32].
 
 **4.2 Training Capacities**
-*   **Endurance:** Ability to resist fatigue. Trained via long intervals, repeat sprints, or small-sided games (SSG) [33].
-*   **Strength:** Maximal force production. Types include Maximal, Relative (strength to weight ratio), and Strength Endurance [34].
-*   **Power:** Force x Velocity [35].
-*   **Speed:** Stride Length x Stride Frequency [36]. Trained via intervals, resistance training, and plyometrics [37].
-*   **Flexibility:** Range of motion (ROM). Females generally more flexible. Trained via Static (post-exercise) or Dynamic (pre-exercise) stretching [38], [39].
-*   **Skill:** Efficiency and consistency of movement. Expert performers have high movement economy and automated processing [40], [41].
+* **Endurance:** Ability to resist fatigue. Trained via long intervals, repeat sprints, or small-sided games (SSG) [33].
+* **Strength:** Maximal force production. Types include Maximal, Relative (strength to weight ratio), and Strength Endurance [34].
+* **Power:** Force x Velocity [35].
+* **Speed:** Stride Length x Stride Frequency [36]. Trained via intervals, resistance training, and plyometrics [37].
+* **Flexibility:** Range of motion (ROM). Females generally more flexible. Trained via Static (post-exercise) or Dynamic (pre-exercise) stretching [38], [39].
+* **Skill:** Efficiency and consistency of movement. Expert performers have high movement economy and automated processing [40], [41].
 
 ---
 
 ## Section 5: Planning and Periodisation
 
 **5.1 Planning Cycles**
-*   **Quadrennial:** 4-year plan (Olympic cycle). Can be Mono-cycle (one peak) or Bi-cycle (two peaks) [42].
-*   **Macrocycle:** Typically 1 year [43].
-*   **Mesocycle:** 4–6 weeks, focused on specific adaptations [43].
-*   **Microcycle:** 1 week (e.g., 1 peak session, recovery, match day) [43].
+* **Quadrennial:** 4-year plan (Olympic cycle). Can be Mono-cycle (one peak) or Bi-cycle (two peaks) [42].
+* **Macrocycle:** Typically 1 year [43].
+* **Mesocycle:** 4–6 weeks, focused on specific adaptations [43].
+* **Microcycle:** 1 week (e.g., 1 peak session, recovery, match day) [43].
 
 **5.2 Phases of Training**
 1.  **General Preparatory:** High volume, moderate intensity (Aerobic/Strength base) [44].
@@ -334,8 +287,8 @@
 5.  **Transition:** Active rest/recovery [46].
 
 **5.3 Tapering**
-*   Reducing load before competition to reduce fatigue while maintaining fitness [47].
-*   **Best Practice:** Reduce volume, maintain intensity [47]. Can improve performance by 2–3% [48].
+* Reducing load before competition to reduce fatigue while maintaining fitness [47].
+* **Best Practice:** Reduce volume, maintain intensity [47]. Can improve performance by 2–3% [48].
 
 ---
 
@@ -351,68 +304,69 @@
 7.  **Active for Life:** Transition to recreational sport, coaching, or administration [54], [55].
 
 **6.2 Youth Considerations (LTT & TTT)**
-*   **Injuries:**
-    *   *Osgood-Schlatter:* Knee pain (tibial tuberosity) [56].
-    *   *Sever’s Disease:* Heel pain (calcaneus) [56].
-    *   *Little Leaguer’s Elbow:* Medial epicondylitis from throwing [57].
-*   **Thermoregulation:** Children gain heat faster and sweat less; need breaks every 15–20 mins in heat [57].
+* **Injuries:**
+    * *Osgood-Schlatter:* Knee pain (tibial tuberosity) [56].
+    * *Sever’s Disease:* Heel pain (calcaneus) [56].
+    * *Little Leaguer’s Elbow:* Medial epicondylitis from throwing [57].
+* **Thermoregulation:** Children gain heat faster and sweat less; need breaks every 15–20 mins in heat [57].
 
 **6.3 Active for Life Streams**
-*   **Competitive for Life:** Masters sports [55].
-*   **Fit for Life:** General health maintenance (combats obesity, osteoporosis) [55].
-*   **Sport Leaders:** Coaching/officiating roles [58].
+* **Competitive for Life:** Masters sports [55].
+* **Fit for Life:** General health maintenance (combats obesity, osteoporosis) [55].
+* **Sport Leaders:** Coaching/officiating roles [58].
 
 ---
 
 ## Section 7: Special Populations
 
 **7.1 Female Athletes**
-*   **Classification (IOC):** Transgender female athletes previously required testosterone <10 nmol/L for 12 months (2015 rules), but 2021 framework shifts to sport-specific rules [59].
-*   **ACL Injury Risk:** Females are 2–8x more likely to suffer non-contact ACL injuries [60].
-    *   *Causes:* Wider pelvis (Q-angle), hormonal laxity (Relaxin), Quad dominance [61], [60].
-    *   *Prevention:* Land with hip/knee flexion, strengthen posterior chain (glutes/hamstrings) [62].
-*   **Menstrual Cycle:**
-    *   *Luteal Phase:* High body temp (heat risk), increased laxity (injury risk), bloating [63], [64].
-    *   *Triad:* Low Energy Availability -> Menstrual Dysfunction (Amenorrhea) -> Low Bone Density (Osteoporosis) [65].
+* **Classification (IOC):** Transgender female athletes previously required testosterone <10 nmol/L for 12 months (2015 rules), but 2021 framework shifts to sport-specific rules [59].
+* **ACL Injury Risk:** Females are 2–8x more likely to suffer non-contact ACL injuries [60].
+    * *Causes:* Wider pelvis (Q-angle), hormonal laxity (Relaxin), Quad dominance [61], [60].
+    * *Prevention:* Land with hip/knee flexion, strengthen posterior chain (glutes/hamstrings) [62].
+* **Menstrual Cycle:**
+    * *Luteal Phase:* High body temp (heat risk), increased laxity (injury risk), bloating [63], [64].
+    * *Triad:* Low Energy Availability -> Menstrual Dysfunction (Amenorrhea) -> Low Bone Density (Osteoporosis) [65].
 
 **7.2 Aging Athletes**
-*   **Physiological Declines:** Reduced VO2 max (~30-40% drop), Sarcopenia (muscle loss ~3kg/decade), lower max heart rate, lower bone density [66], [67], [68].
-*   **Bone Health:** Osteoporosis risk increases. Cycling/Swimming do *not* help bone density. High-impact/resistance training is required [69], [70].
-*   **Training:** Requires longer recovery, thorough warm-ups, and pre-exercise screening (cardiac risk) [71], [72].
+* **Physiological Declines:** Reduced VO2 max (~30-40% drop), Sarcopenia (muscle loss ~3kg/decade), lower max heart rate, lower bone density [66], [67], [68].
+* **Bone Health:** Osteoporosis risk increases. Cycling/Swimming do *not* help bone density. High-impact/resistance training is required [69], [70].
+* **Training:** Requires longer recovery, thorough warm-ups, and pre-exercise screening (cardiac risk) [71], [72].
 
 **7.3 Athletes with Disability**
-*   **Coaching:** Principles (progressive overload, periodisation) remain the same; modify for specific constraints [73].
-*   **Spinal Cord Injury (SCI):**
-    *   *Thermoregulation:* Impaired sweating below lesion (overheating risk) [74].
-    *   *Autonomic Dysreflexia:* Dangerous BP spike from pain stimulus [74].
-*   **Cerebral Palsy:** Characterized by Spasticity (hyperactive stretch reflex). Stretching is a priority [75], [76].
-*   **Sensory Impairment:**
-    *   *Vision:* Use guides, auditory balls [77].
-    *   *Hearing:* Use visual cues/sign language [78].
+* **Coaching:** Principles (progressive overload, periodisation) remain the same; modify for specific constraints [73].
+* **Spinal Cord Injury (SCI):**
+    * *Thermoregulation:* Impaired sweating below lesion (overheating risk) [74].
+    * *Autonomic Dysreflexia:* Dangerous BP spike from pain stimulus [74].
+* **Cerebral Palsy:** Characterized by Spasticity (hyperactive stretch reflex). Stretching is a priority [75], [76].
+* **Sensory Impairment:**
+    * *Vision:* Use guides, auditory balls [77].
+    * *Hearing:* Use visual cues/sign language [78].
 
 ---
 
 ## Section 8: Future Trends and Technology
 
 **8.1 Data Analytics**
-*   **Types:**
-    *   *Descriptive:* What happened? (e.g., GPS distance) [79].
-    *   *Diagnostic:* Why did it happen? [79].
-    *   *Predictive:* What will happen? (e.g., Brentford FC using "hops" metric to predict aerial wins) [79], [80].
-    *   *Prescriptive:* How do we make it happen? [79].
-*   **Process:** Collect -> Store/Clean -> Visualize -> Consult [81], [82].
+* **Types:**
+    * *Descriptive:* What happened? (e.g., GPS distance) [79].
+    * *Diagnostic:* Why did it happen? [79].
+    * *Predictive:* What will happen? (e.g., Brentford FC using "hops" metric to predict aerial wins) [79], [80].
+    * *Prescriptive:* How do we make it happen? [79].
+* **Process:** Collect -> Store/Clean -> Visualize -> Consult [81], [82].
 
 **8.2 Artificial Intelligence (AI)**
-*   **Officiating:** Semi-automated offside tech (limb-tracking + smart ball) [83].
-*   **Programming:** AI apps (e.g., Coach Cat) automate plans but require human oversight for context (e.g., sleep quality vs. HRV) [84], [85].
+* **Officiating:** Semi-automated offside tech (limb-tracking + smart ball) [83].
+* **Programming:** AI apps (e.g., Coach Cat) automate plans but require human oversight for context (e.g., sleep quality vs. HRV) [84], [85].
 
 **8.3 Super Shoes**
-*   **Technology:** Carbon fiber plate + large foam base [86].
-*   **Benefits:** Improve running economy by ~4% (approx. 2% faster time) [87].
-*   **Mechanism:** Carbon plate acts as a lever at the MTP joint and ankle to reduce energy loss [87].
-*   **Regulations:** Stack height must be ≤ 40mm; only one rigid plate allowed [88].
+* **Technology:** Carbon fiber plate + large foam base [86].
+* **Benefits:** Improve running economy by ~4% (approx. 2% faster time) [87].
+* **Mechanism:** Carbon plate acts as a lever at the MTP joint and ankle to reduce energy loss [87].
+* **Regulations:** Stack height must be ≤ 40mm; only one rigid plate allowed [88].
     `.trim();
 
+    // --- SYSTEM PROMPT BUILDER (Restored) ---
     function buildSystemPrompt() {
       return `
 Your role:
@@ -447,18 +401,8 @@ ${knowledgeBase}
       `.trim();
     }
 
-    function initMessages() {
-      messages = [
-        {
-          role: "system",
-          content: buildSystemPrompt(),
-        },
-      ];
-    }
-
-    // Initialise messages on load
-    initMessages();
-
+    // --- UI HELPER FUNCTIONS ---
+    
     function escapeHtml(text) {
       return text
         .replace(/&/g, "&amp;")
@@ -468,53 +412,89 @@ ${knowledgeBase}
 
     function formatMessage(content) {
       const escaped = escapeHtml(content);
-      const withBold = escaped.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+      const withBold = escaped.replace(/\*\*(.*?)\*\*/g, "<strong class='text-indigo-300'>$1</strong>");
       return withBold.replace(/\n/g, "<br>");
     }
 
-    function addMessage(role, content) {
-      const div = document.createElement("div");
-      div.className = `msg ${role}`;
-      div.innerHTML = formatMessage(content);
-      chatLog.appendChild(div);
-      chatLog.scrollTop = chatLog.scrollHeight;
+    function addUserMessage(content) {
+        const div = document.createElement("div");
+        div.className = "flex gap-4 flex-row-reverse animate-[fadeIn_0.3s_ease-out]";
+        div.innerHTML = `
+            <div class="space-y-1 max-w-[85%]">
+                <div class="msg-user bg-indigo-600 text-white p-4 text-sm leading-relaxed shadow-lg">
+                    ${formatMessage(content)}
+                </div>
+            </div>
+        `;
+        chatLog.appendChild(div);
+        chatLog.scrollTop = chatLog.scrollHeight;
     }
 
-    function setLoading(isLoading) {
-      sendBtn.disabled = isLoading;
-      spinner.style.display = isLoading ? "inline" : "none";
+    function addBotMessage(content) {
+        const div = document.createElement("div");
+        div.className = "flex gap-4 animate-[slideIn_0.3s_ease-out]";
+        div.innerHTML = `
+             <img src="https://www.rehabtools.org/uploads/5/4/2/3/54237171/ross-clark_orig.jpg" 
+                  class="w-10 h-10 rounded-full object-cover border border-slate-700 flex-none self-end mb-1" 
+                  alt="Ross Clark"
+                  onerror="this.src='https://ui-avatars.com/api/?name=Ross+Clark&background=6366f1&color=fff'">
+            <div class="space-y-1 max-w-[85%]">
+                <div class="text-xs text-slate-500 ml-1">Ross Clark</div>
+                <div class="msg-bot bg-slate-800 border border-slate-700 p-4 text-sm leading-relaxed shadow-sm text-slate-200">
+                    ${formatMessage(content)}
+                </div>
+            </div>
+        `;
+        chatLog.appendChild(div);
+        chatLog.scrollTop = chatLog.scrollHeight;
     }
 
-    // Simple local crisis detection to short-circuit and show support info
+    function setTyping(isTyping) {
+      if (isTyping) {
+        typingIndicator.classList.remove("hidden");
+        sendBtn.disabled = true;
+        sendBtn.classList.add("opacity-50", "cursor-not-allowed");
+        chatLog.appendChild(typingIndicator); 
+        chatLog.scrollTop = chatLog.scrollHeight;
+      } else {
+        typingIndicator.classList.add("hidden");
+        sendBtn.disabled = false;
+        sendBtn.classList.remove("opacity-50", "cursor-not-allowed");
+      }
+    }
+
+    // --- LOGIC RESTORATION ---
+
+    function initMessages() {
+      messages = [
+        {
+          role: "system",
+          content: buildSystemPrompt(),
+        },
+      ];
+    }
+    
+    // Initialise on load
+    initMessages();
+
+    // Crisis detection
     function looksLikeCrisis(text) {
       const lowered = text.toLowerCase();
-      const keywords = [
-        "kill myself",
-        "suicide",
-        "want to die",
-        "end my life",
-        "self harm",
-        "self-harm",
-        "hurt myself",
-      ];
+      const keywords = ["kill myself", "suicide", "want to die", "end my life", "self harm", "self-harm", "hurt myself"];
       return keywords.some((k) => lowered.includes(k));
     }
 
     function crisisResponse() {
-      // You can edit this text to match your campus.
-      return `
-I'm really glad you reached out — your safety and wellbeing are far more important than this course.
-
-I can't provide crisis counselling, but please consider these options right now:
-
-• If you are in immediate danger or feel unsafe: call Emergency Services on 000 (in Australia).
-• You can contact Lifeline on 13 11 14 or via online chat at https://www.lifeline.org.au/.
-• If you are a student, please contact your university's student wellbeing/services team or campus security as soon as possible (check your student portal for the right number).
-
-You do not have to go through this alone — please reach out to someone you trust or one of the services above as soon as you can.
-      `.trim();
+      return `I'm really glad you reached out — your safety is the most important thing.
+      <br><br>
+      I can't provide crisis counselling, but please consider these options right now:
+      <br>• If you are in immediate danger call <strong>000</strong> (Australia).
+      <br>• Contact <strong>Lifeline</strong> on <strong>13 11 14</strong>.
+      <br>• If you are a student, please contact your university's student wellbeing team.
+      <br><br>You do not have to go through this alone.`;
     }
 
+    // Form Submission
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       errorSpan.textContent = "";
@@ -522,21 +502,26 @@ You do not have to go through this alone — please reach out to someone you tru
       const userText = textarea.value.trim();
       if (!userText) return;
 
-      // Add user message to UI and history
-      addMessage("user", userText);
-      messages.push({ role: "user", content: userText });
+      // 1. Add user message
+      addUserMessage(userText);
+      messages.push({ role: "user", content: userText }); // Update history
       textarea.value = "";
-      setLoading(true);
+      textarea.style.height = 'auto'; // Reset height
+      
+      setTyping(true);
 
-      // Local crisis handling (extra safety layer)
+      // 2. Local Crisis Check
       if (looksLikeCrisis(userText)) {
-        const supportText = crisisResponse();
-        addMessage("assistant", supportText);
-        messages.push({ role: "assistant", content: supportText });
-        setLoading(false);
+        setTimeout(() => {
+            const supportText = crisisResponse();
+            addBotMessage(supportText);
+            messages.push({ role: "assistant", content: supportText });
+            setTyping(false);
+        }, 1000); 
         return;
       }
 
+      // 3. Backend Call (Restored)
       try {
         const response = await fetch(API_URL, {
           method: "POST",
@@ -554,55 +539,36 @@ You do not have to go through this alone — please reach out to someone you tru
 
         if (!response.ok) {
           console.error("Backend error:", data || rawText);
-          let backendMsg = "The server returned an error. Check function logs.";
-          if (data) {
-            if (typeof data.error === "string") {
-              backendMsg = data.error;
-            } else if (
-              data.error &&
-              typeof data.error.message === "string"
-            ) {
-              backendMsg = data.error.message;
-            } else {
-              backendMsg = JSON.stringify(data);
-            }
-          } else if (rawText) {
-            backendMsg = rawText;
-          }
-          errorSpan.textContent =
-            "Error contacting the chatbot: " + backendMsg;
-          setLoading(false);
+          let backendMsg = "The server returned an error.";
+          if (data && data.error) backendMsg = typeof data.error === "string" ? data.error : data.error.message;
+          
+          errorSpan.textContent = "Error: " + backendMsg;
+          setTyping(false);
           return;
         }
 
-        const reply =
-          data?.choices?.[0]?.message?.content ||
-          "Sorry, I couldn't generate a response just now.";
+        const reply = data?.choices?.[0]?.message?.content || "Sorry, I couldn't generate a response just now.";
 
-        addMessage("assistant", reply);
+        addBotMessage(reply);
         messages.push({ role: "assistant", content: reply });
+
       } catch (err) {
         console.error(err);
-        errorSpan.textContent =
-          "Network error contacting the chatbot. Please try again.";
+        setTyping(false);
+        errorSpan.textContent = "Network error connecting to backend.";
       } finally {
-        setLoading(false);
-        textarea.focus();
+        setTyping(false);
       }
     });
 
-    // Allow Ctrl+Enter / Cmd+Enter to send
-    textarea.addEventListener("keydown", (event) => {
-      if (
-        (event.ctrlKey || event.metaKey) &&
-        event.key === "Enter" &&
-        !sendBtn.disabled
-      ) {
-        form.dispatchEvent(new Event("submit"));
-      }
+    // Handle Enter key
+    textarea.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            form.dispatchEvent(new Event("submit"));
+        }
     });
+
   </script>
-
-  
 </body>
 </html>
