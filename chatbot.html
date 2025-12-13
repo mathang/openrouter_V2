@@ -176,26 +176,26 @@
     <header>
       <div class="status-dot"></div>
       <div>
-        <h1>AI Tools for Teaching Assistant</h1>
-        <span>Answers based only on the provided AI tools resource</span>
+        <h1>SPX102 Coaching Chatbot</h1>
+        <span>Answers based only on the SPX102 INTRODUCTION TO COACHING notes</span>
       </div>
     </header>
 
     <div id="chat-log">
       <div class="msg system">
-        Welcome! I’m your assistant for exploring AI tools for teaching. Ask me
-        about the workflows or tools in this resource.
+        Welcome! I’m your assistant for SPX102 INTRODUCTION TO COACHING. Ask me
+        anything about the course concepts in the provided notes.
       </div>
     </div>
 
     <form id="chat-form">
       <textarea
         id="user-input"
-        placeholder="Ask about AI tools for teaching, workflows, or how to use specific tools..."
+        placeholder="Ask about SPX102 coaching concepts, examples, or how topics connect..."
       ></textarea>
       <div class="form-row">
         <div class="hint">
-          I can only answer questions based on the AI tools for teaching resource I was given.
+          I can only answer questions based on the SPX102 INTRODUCTION TO COACHING notes I was given.
         </div>
         <div>
           <span id="error" class="error"></span>
@@ -221,55 +221,202 @@
     let messages = [];
 
     const knowledgeBase = `
-## Resource meta
-- **Title:** AI tools for teaching: Which ones are helpful and how should I use them?
-- **Overview:** How different AI tools can support university teaching, with workflows for quick refreshes, interactivity, and full redevelopment. Includes an AI Tools Impact Matrix scoring teacher helpfulness (0–100), student helpfulness (0–100), and learning curve (1–10; green = easy, red = hard).
+## Section 1: Coaching Pedagogy and Methodology
 
-## Workflows
-### Rapid course refresh (minimal time)
-1) Gather relevant content (transcripts, policies, outlines). Improve weak transcripts with **Turboscribe**; work one week at a time.
-2) Upload to a **mainstream LLM** (Gemini or ChatGPT) in deep-reasoning mode to review and update. Expect ~10+ minutes for a thorough report.
-3) Ask the LLM for a slide transcript for an XX-minute PowerPoint (≤10 slides per recording on free tiers) to use as a teleprompter.
-4) Upload transcript/content to **Gamma** to generate slides; tweak settings/images and export to PowerPoint for final edits.
-5) Record the presentation with your preferred screen recorder (e.g., Loom) using the slides and transcript.
-6) Upload the video and teleprompter text to your LMS (e.g., Canvas).
-- **Notes:** Check accuracy at every stage. You can use **Openrouter** for model consensus but keep a human-in-the-loop.
+**1.1 The Role of the Coach**
+*   **Primary Goal:** Enhance performance (executing a skill in a specific context) [1], [2].
+*   **Key Functions:** Teaching, facilitating practice, providing feedback, and acting as a guide/facilitator rather than just an explicit instructor [2], [3].
+*   **Modern vs. Old School:** Modern coaching focuses on athlete problem-solving and games-based approaches, whereas "old school" (20th century) focused on isolation drills and explicit instruction [3].
+*   **Frameworks:** Coaching must adjust for Specificity (training specific to the sport) and Individuality (adjusting for athlete needs) [4].
 
-### Make the course interactive
-- Use the **AI Tools Impact Matrix (butterfly chart)**: teacher helpfulness on the left, student helpfulness on the right; bar color shows learning curve (green easy, red steep).
-- **Recommendation:** Start with tools that have high student helpfulness and manageable learning curves; integrate them into activities, interactive content, and feedback.
+**1.2 Learning Modalities**
+*   **Visual:** Prefers graphs, diagrams, demonstrations [5].
+*   **Auditory:** Prefers listening to instructions [5].
+*   **Kinesthetic:** Prefers to learn by doing/feeling body positions [5].
+*   **Reader/Writer:** Prefers taking notes [5].
+*   **Multimodal:** Most learners prefer a combination of methods [5].
 
-### Full course redevelopment
-1) Use **Openrouter** or a powerful LLM to build a detailed course plan.
-2) Generate core materials with your expertise plus a **mainstream LLM** (Gemini, ChatGPT, Claude).
-3) Provide materials to **NotebookLM** to create transcripts, slides, quizzes, podcasts, mind maps, and other resources.
-4) Share the NotebookLM notebook with students (paid plan) for curated access.
-5) Build student-facing chatbots with **ElevenLabs** (high-quality voice) or **Cogniti** (Canvas/institution integration).
-6) For interactive activities (simulations, games, practice assessments), use coding-capable **mainstream LLMs** or specialised tools like **Codex**.
-- **Notes:** Assumes major redesign. High-impact elements: strong NotebookLM notebook, custom chatbots, bespoke interactives.
+**1.3 The Learning Process Loop**
+1.  **Instruction:** Verbal communication [6].
+2.  **Practice/Execution:** Performing the skill [7].
+3.  **Feedback/Reflection:** Reviewing performance [7].
+4.  **Learning Effect:** Positive adaptation or maladaptation [7].
+5.  **Retention:** Consolidating the skill [7].
 
-## Tool highlights (sample)
-- **Gamma** — AI-generated slides/websites/social media; teacher helpfulness 90, student 50, learning curve 1.
-- **Openrouter** — Model hub for consensus across multiple LLMs in workflows.
-- **Turboscribe** — Speech-to-text transcription; teacher 80, student 80, learning curve 1; great for converting lectures.
-- **NotebookLM** — Curated content notebooks for generating transcripts, quizzes, and shared student access.
-- **ElevenLabs** — Realistic voice models and voice chatbots (student helpfulness 100, learning curve 3).
-- **Cogniti** — Canvas/institution-friendly chatbot tooling.
-- **Gradescope** — AI-assisted marking platform; teacher helpfulness 100, student 50, learning curve 5.
-- **Figma AI** — Design/prototyping with AI; learning design interfaces and diagrams.
-- **Atlas** — Student study assistant with RAG; limited teacher control over content.
-- **Scite.ai** — Citation analysis (supporting/contradicting/mentioning) for evidence-based teaching.
-- **Opal** — No-code AI app builder for workflows; overlaps with Gemini/Claude.
-- **Flow (Veo 3.1)** — Video creation with persistent characters/backgrounds for branching narratives.
-- **MedGemma-27B** — Medically trained model (API, coding skills required).
-- **Marble** — 3D world creation (early-stage, high effort vs payoff).
-- **Lyria RealTime** — Real-time music generation via Gemini API.
+**1.4 Instruction and Demonstration**
+*   **Verbal Tips:** Use short, simple keywords; avoid information overload; use a "Sandwich approach" for feedback (Positive-Constructive-Positive) [8]. Avoid pointing out "what not to do" [9].
+*   **Demonstration:** Must be performed correctly to avoid negative motor programs [9]. Show at normal speed first to demonstrate timing, then break down if needed [10].
+
+**1.5 Feedback Types**
+*   **Task Intrinsic:** Sensory info available to the athlete naturally (visual, proprioceptive) [11].
+*   **Augmented:** Info provided by the coach [12].
+    *   **Knowledge of Results (KR):** Outcome (e.g., "Did it go in?") [12].
+    *   **Knowledge of Performance (KP):** Technical info (e.g., "Knee angle was wrong") [12].
+
+**1.6 Games-Based Learning (GBL) & Session Design**
+*   **Dynamic Systems Theory:** Skills emerge from the interaction of Task, Performer, and Environment constraints [13].
+*   **Modification Frameworks:**
+    *   **TREE:** Teaching style, Rules, Environment, Equipment [14].
+    *   **CHANGE IT:** Coaching style, How to score, Area, Numbers, Game rules, Equipment, Inclusion, Time [14], [15].
+*   **Teaching Games for Understanding (TGfU):** Uses modified games to teach skills/tactics under pressure (e.g., 3v3 soccer on a small pitch) [15].
+*   **Technique Variability:** There is no single "perfect" technique; variability is normal. Only modify technique for injury prevention or clear performance enhancement [16], [17].
+
+**1.7 Warm-Up Design**
+*   **Effectiveness:** Dynamic warm-ups improve sprint/jump performance by 7–8% [18].
+*   **Caution:** Static stretching can reduce max strength by ~30% for up to 20 minutes [19].
+*   **Team Sport Formula:** 1. Range of Motion (low load) -> 2. Dynamic component (3-5 min) -> 3. Skill warm-up -> 4. Small-sided game [19].
+
+---
+
+## Section 2: Officiating
+
+**2.1 Role of the Official**
+*   **Definition:** Controls gameplay by applying laws/rules to ensure fair play [20].
+*   **Three Key Duties:** Control the game, Decision-making (fractions of a second), Communication (explaining decisions) [21].
+*   **Categories:**
+    *   **Interactors:** High physical/interaction demands (e.g., Soccer referee) [22].
+    *   **Monitors:** Low physical, high cue processing (e.g., Volleyball ref) [22].
+    *   **Reactors:** Low interaction/movement (e.g., Tennis line judge) [22].
+*   **Decision-Making Process:** Stimulus -> Perception -> Categorization -> Memory Access -> Integration -> Response [23], [24].
+
+---
+
+## Section 3: Talent Identification and Testing
+
+**3.1 Types of Talent ID**
+*   **Talent Selection:** Choosing athletes already participating in the sport (e.g., draft combines) [25].
+*   **Talent Detection:** Recruiting athletes from outside the sport based on physical attributes (e.g., long legs for rowing) [25].
+
+**3.2 Testing Principles**
+*   **Reliability:** Consistency of measurement (reproducibility) [26].
+*   **Validity:** Accuracy of measurement (measuring what it intends to measure) [27].
+
+**3.3 Kinanthropometry**
+*   **Definition:** Measuring body segment lengths, girths, and ratios [28].
+*   **Peak Height Velocity (PHV):** The period of fastest growth during puberty; requires load management to prevent injury [29].
+*   **Bone Density:** Critical for preventing stress fractures; measured via DEXA [29].
+
+---
+
+## Section 4: Training Principles and Capacities
+
+**4.1 Core Principles**
+*   **Overload:** Manipulating load to stimulate adaptation [30].
+*   **FIT:** Frequency, Intensity, Time/Duration, Type [30].
+*   **Specificity:** Adaptations are specific to the training mode [31].
+*   **Individuality:** Athletes adapt differently based on age, genetics, and history [31].
+*   **Reversibility:** "Use it or lose it" [31].
+*   **Super Compensation:** The cycle of fatigue followed by recovery and improved capacity [32].
+
+**4.2 Training Capacities**
+*   **Endurance:** Ability to resist fatigue. Trained via long intervals, repeat sprints, or small-sided games (SSG) [33].
+*   **Strength:** Maximal force production. Types include Maximal, Relative (strength to weight ratio), and Strength Endurance [34].
+*   **Power:** Force x Velocity [35].
+*   **Speed:** Stride Length x Stride Frequency [36]. Trained via intervals, resistance training, and plyometrics [37].
+*   **Flexibility:** Range of motion (ROM). Females generally more flexible. Trained via Static (post-exercise) or Dynamic (pre-exercise) stretching [38], [39].
+*   **Skill:** Efficiency and consistency of movement. Expert performers have high movement economy and automated processing [40], [41].
+
+---
+
+## Section 5: Planning and Periodisation
+
+**5.1 Planning Cycles**
+*   **Quadrennial:** 4-year plan (Olympic cycle). Can be Mono-cycle (one peak) or Bi-cycle (two peaks) [42].
+*   **Macrocycle:** Typically 1 year [43].
+*   **Mesocycle:** 4–6 weeks, focused on specific adaptations [43].
+*   **Microcycle:** 1 week (e.g., 1 peak session, recovery, match day) [43].
+
+**5.2 Phases of Training**
+1.  **General Preparatory:** High volume, moderate intensity (Aerobic/Strength base) [44].
+2.  **Specific Preparatory:** Higher intensity, sport-specific conditioning [45].
+3.  **Pre-Competition:** High intensity, low volume, tactical focus [45].
+4.  **Competition:** Maintenance of fitness, peak performance [45].
+5.  **Transition:** Active rest/recovery [46].
+
+**5.3 Tapering**
+*   Reducing load before competition to reduce fatigue while maintaining fitness [47].
+*   **Best Practice:** Reduce volume, maintain intensity [47]. Can improve performance by 2–3% [48].
+
+---
+
+## Section 6: Long-Term Athlete Development (LTAD)
+
+**6.1 The 7 Stages**
+1.  **Active Start (0-6):** Fun, fundamental movements [49].
+2.  **FUNdamentals (6-9/10):** Agility, balance, coordination. No specialization [49].
+3.  **Learn to Train (8-11/12):** Sport-specific skills, motor learning window [49].
+4.  **Train to Train (11-15/16):** Aerobic base, strength, PHV management [50], [51].
+5.  **Train to Compete (15-21+):** Specialization, high intensity, sophisticated periodisation [50], [52].
+6.  **Train to Win (18+):** Elite performance, winning focus, autonomous athletes [50], [53].
+7.  **Active for Life:** Transition to recreational sport, coaching, or administration [54], [55].
+
+**6.2 Youth Considerations (LTT & TTT)**
+*   **Injuries:**
+    *   *Osgood-Schlatter:* Knee pain (tibial tuberosity) [56].
+    *   *Sever’s Disease:* Heel pain (calcaneus) [56].
+    *   *Little Leaguer’s Elbow:* Medial epicondylitis from throwing [57].
+*   **Thermoregulation:** Children gain heat faster and sweat less; need breaks every 15–20 mins in heat [57].
+
+**6.3 Active for Life Streams**
+*   **Competitive for Life:** Masters sports [55].
+*   **Fit for Life:** General health maintenance (combats obesity, osteoporosis) [55].
+*   **Sport Leaders:** Coaching/officiating roles [58].
+
+---
+
+## Section 7: Special Populations
+
+**7.1 Female Athletes**
+*   **Classification (IOC):** Transgender female athletes previously required testosterone <10 nmol/L for 12 months (2015 rules), but 2021 framework shifts to sport-specific rules [59].
+*   **ACL Injury Risk:** Females are 2–8x more likely to suffer non-contact ACL injuries [60].
+    *   *Causes:* Wider pelvis (Q-angle), hormonal laxity (Relaxin), Quad dominance [61], [60].
+    *   *Prevention:* Land with hip/knee flexion, strengthen posterior chain (glutes/hamstrings) [62].
+*   **Menstrual Cycle:**
+    *   *Luteal Phase:* High body temp (heat risk), increased laxity (injury risk), bloating [63], [64].
+    *   *Triad:* Low Energy Availability -> Menstrual Dysfunction (Amenorrhea) -> Low Bone Density (Osteoporosis) [65].
+
+**7.2 Aging Athletes**
+*   **Physiological Declines:** Reduced VO2 max (~30-40% drop), Sarcopenia (muscle loss ~3kg/decade), lower max heart rate, lower bone density [66], [67], [68].
+*   **Bone Health:** Osteoporosis risk increases. Cycling/Swimming do *not* help bone density. High-impact/resistance training is required [69], [70].
+*   **Training:** Requires longer recovery, thorough warm-ups, and pre-exercise screening (cardiac risk) [71], [72].
+
+**7.3 Athletes with Disability**
+*   **Coaching:** Principles (progressive overload, periodisation) remain the same; modify for specific constraints [73].
+*   **Spinal Cord Injury (SCI):**
+    *   *Thermoregulation:* Impaired sweating below lesion (overheating risk) [74].
+    *   *Autonomic Dysreflexia:* Dangerous BP spike from pain stimulus [74].
+*   **Cerebral Palsy:** Characterized by Spasticity (hyperactive stretch reflex). Stretching is a priority [75], [76].
+*   **Sensory Impairment:**
+    *   *Vision:* Use guides, auditory balls [77].
+    *   *Hearing:* Use visual cues/sign language [78].
+
+---
+
+## Section 8: Future Trends and Technology
+
+**8.1 Data Analytics**
+*   **Types:**
+    *   *Descriptive:* What happened? (e.g., GPS distance) [79].
+    *   *Diagnostic:* Why did it happen? [79].
+    *   *Predictive:* What will happen? (e.g., Brentford FC using "hops" metric to predict aerial wins) [79], [80].
+    *   *Prescriptive:* How do we make it happen? [79].
+*   **Process:** Collect -> Store/Clean -> Visualize -> Consult [81], [82].
+
+**8.2 Artificial Intelligence (AI)**
+*   **Officiating:** Semi-automated offside tech (limb-tracking + smart ball) [83].
+*   **Programming:** AI apps (e.g., Coach Cat) automate plans but require human oversight for context (e.g., sleep quality vs. HRV) [84], [85].
+
+**8.3 Super Shoes**
+*   **Technology:** Carbon fiber plate + large foam base [86].
+*   **Benefits:** Improve running economy by ~4% (approx. 2% faster time) [87].
+*   **Mechanism:** Carbon plate acts as a lever at the MTP joint and ankle to reduce energy loss [87].
+*   **Regulations:** Stack height must be ≤ 40mm; only one rigid plate allowed [88].
     `.trim();
 
     function buildSystemPrompt() {
       return `
 Your role:
-- You are a general-purpose assistant.
+- You are the SPX102 INTRODUCTION TO COACHING course chatbot. Answer only from the provided notes.
 
 You MUST follow these rules exactly:
 
