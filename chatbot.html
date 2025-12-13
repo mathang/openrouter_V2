@@ -495,7 +495,6 @@ ${knowledgeBase}
         `;
         chatLog.appendChild(div);
         chatLog.scrollTop = chatLog.scrollHeight;
-        return div.querySelector('.msg-bot');
     }
 
     function setTyping(isTyping) {
@@ -577,7 +576,7 @@ ${knowledgeBase}
       messages.push({ role: "user", content: messageToSend }); // Update history
       textarea.value = "";
       textarea.style.height = 'auto'; // Reset height
-
+      
       setTyping(true);
 
       // 2. Local Crisis Check
@@ -587,11 +586,11 @@ ${knowledgeBase}
             addBotMessage(supportText);
             messages.push({ role: "assistant", content: supportText });
             setTyping(false);
-        }, 1000);
+        }, 1000); 
         return;
       }
 
-      // 3. Backend Call (streaming)
+      // 3. Backend Call (Restored)
       try {
         const response = await fetch(API_URL, {
           method: "POST",
@@ -599,78 +598,32 @@ ${knowledgeBase}
           body: JSON.stringify({ messages }),
         });
 
+        const rawText = await response.text();
+        let data = null;
+        try {
+          data = JSON.parse(rawText);
+        } catch (e) {
+          console.error("Non-JSON response from backend:", rawText);
+        }
+
         if (!response.ok) {
+          console.error("Backend error:", data || rawText);
           let backendMsg = "The server returned an error.";
-          try {
-            const errorData = await response.json();
-            if (errorData && errorData.error) {
-              backendMsg = typeof errorData.error === "string" ? errorData.error : errorData.error.message;
-            }
-          } catch (e) {
-            const fallbackText = await response.text();
-            backendMsg = fallbackText || backendMsg;
-          }
-          console.error("Backend error:", backendMsg);
+          if (data && data.error) backendMsg = typeof data.error === "string" ? data.error : data.error.message;
+          
           errorSpan.textContent = "Error: " + backendMsg;
+          setTyping(false);
           return;
         }
 
-        const contentType = response.headers.get("content-type") || "";
-        const isStream = contentType.includes("text/event-stream");
+        const reply = data?.choices?.[0]?.message?.content || "Sorry, I couldn't generate a response just now.";
 
-        if (!isStream) {
-          const data = await response.json();
-          const reply = data?.choices?.[0]?.message?.content || "Sorry, I couldn't generate a response just now.";
-          addBotMessage(reply);
-          messages.push({ role: "assistant", content: reply });
-          return;
-        }
+        addBotMessage(reply);
+        messages.push({ role: "assistant", content: reply });
 
-        const reader = response.body?.getReader();
-        if (!reader) throw new Error("No response stream available.");
-
-        const decoder = new TextDecoder();
-        let buffer = "";
-        let fullText = "";
-        const botMessage = addBotMessage("");
-
-        const flushBuffer = () => {
-          const events = buffer.split(/\n\n/);
-          buffer = events.pop() || "";
-          events.forEach((eventChunk) => {
-            const dataLine = eventChunk.split(/\n/).find((line) => line.startsWith("data:"));
-            if (!dataLine) return;
-            const jsonStr = dataLine.replace(/^data:\s*/, "");
-            if (jsonStr === "[DONE]") return;
-            try {
-              const parsed = JSON.parse(jsonStr);
-              const delta = parsed?.choices?.[0]?.delta?.content || "";
-              if (delta) {
-                fullText += delta;
-                botMessage.innerHTML = formatMessage(fullText);
-                chatLog.scrollTop = chatLog.scrollHeight;
-              }
-            } catch (e) {
-              console.error("Failed to parse stream chunk", e, jsonStr);
-            }
-          });
-        };
-
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          flushBuffer();
-        }
-
-        buffer += decoder.decode();
-        flushBuffer();
-
-        const finalReply = fullText || "Sorry, I couldn't generate a response just now.";
-        botMessage.innerHTML = formatMessage(finalReply);
-        messages.push({ role: "assistant", content: finalReply });
       } catch (err) {
         console.error(err);
+        setTyping(false);
         errorSpan.textContent = "Network error connecting to backend.";
       } finally {
         setTyping(false);
