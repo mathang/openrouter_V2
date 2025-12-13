@@ -220,20 +220,58 @@
     // Full message history (including system prompt)
     let messages = [];
 
-    function initMessages() {
-      const kbScript = document.getElementById("knowledge-base");
-      let kbJsonText = "";
+    const knowledgeBase = `
+## Resource meta
+- **Title:** AI tools for teaching: Which ones are helpful and how should I use them?
+- **Overview:** How different AI tools can support university teaching, with workflows for quick refreshes, interactivity, and full redevelopment. Includes an AI Tools Impact Matrix scoring teacher helpfulness (0–100), student helpfulness (0–100), and learning curve (1–10; green = easy, red = hard).
 
-      if (kbScript) {
-        kbJsonText = kbScript.textContent.trim();
-      }
+## Workflows
+### Rapid course refresh (minimal time)
+1) Gather relevant content (transcripts, policies, outlines). Improve weak transcripts with **Turboscribe**; work one week at a time.
+2) Upload to a **mainstream LLM** (Gemini or ChatGPT) in deep-reasoning mode to review and update. Expect ~10+ minutes for a thorough report.
+3) Ask the LLM for a slide transcript for an XX-minute PowerPoint (≤10 slides per recording on free tiers) to use as a teleprompter.
+4) Upload transcript/content to **Gamma** to generate slides; tweak settings/images and export to PowerPoint for final edits.
+5) Record the presentation with your preferred screen recorder (e.g., Loom) using the slides and transcript.
+6) Upload the video and teleprompter text to your LMS (e.g., Canvas).
+- **Notes:** Check accuracy at every stage. You can use **Openrouter** for model consensus but keep a human-in-the-loop.
 
-      const systemPrompt = `
+### Make the course interactive
+- Use the **AI Tools Impact Matrix (butterfly chart)**: teacher helpfulness on the left, student helpfulness on the right; bar color shows learning curve (green easy, red steep).
+- **Recommendation:** Start with tools that have high student helpfulness and manageable learning curves; integrate them into activities, interactive content, and feedback.
+
+### Full course redevelopment
+1) Use **Openrouter** or a powerful LLM to build a detailed course plan.
+2) Generate core materials with your expertise plus a **mainstream LLM** (Gemini, ChatGPT, Claude).
+3) Provide materials to **NotebookLM** to create transcripts, slides, quizzes, podcasts, mind maps, and other resources.
+4) Share the NotebookLM notebook with students (paid plan) for curated access.
+5) Build student-facing chatbots with **ElevenLabs** (high-quality voice) or **Cogniti** (Canvas/institution integration).
+6) For interactive activities (simulations, games, practice assessments), use coding-capable **mainstream LLMs** or specialised tools like **Codex**.
+- **Notes:** Assumes major redesign. High-impact elements: strong NotebookLM notebook, custom chatbots, bespoke interactives.
+
+## Tool highlights (sample)
+- **Gamma** — AI-generated slides/websites/social media; teacher helpfulness 90, student 50, learning curve 1.
+- **Openrouter** — Model hub for consensus across multiple LLMs in workflows.
+- **Turboscribe** — Speech-to-text transcription; teacher 80, student 80, learning curve 1; great for converting lectures.
+- **NotebookLM** — Curated content notebooks for generating transcripts, quizzes, and shared student access.
+- **ElevenLabs** — Realistic voice models and voice chatbots (student helpfulness 100, learning curve 3).
+- **Cogniti** — Canvas/institution-friendly chatbot tooling.
+- **Gradescope** — AI-assisted marking platform; teacher helpfulness 100, student 50, learning curve 5.
+- **Figma AI** — Design/prototyping with AI; learning design interfaces and diagrams.
+- **Atlas** — Student study assistant with RAG; limited teacher control over content.
+- **Scite.ai** — Citation analysis (supporting/contradicting/mentioning) for evidence-based teaching.
+- **Opal** — No-code AI app builder for workflows; overlaps with Gemini/Claude.
+- **Flow (Veo 3.1)** — Video creation with persistent characters/backgrounds for branching narratives.
+- **MedGemma-27B** — Medically trained model (API, coding skills required).
+- **Marble** — 3D world creation (early-stage, high effort vs payoff).
+- **Lyria RealTime** — Real-time music generation via Gemini API.
+    `.trim();
+
+    function buildSystemPrompt() {
+      return `
 Your role:
 - You are a general-purpose assistant.
 
 You MUST follow these rules exactly:
-
 
 1. PRIORITISE SAFETY OF THE USER
    - If the user appears to be in immediate danger, at risk of harming themselves, or describes serious harm from others:
@@ -255,17 +293,18 @@ You MUST follow these rules exactly:
 3. STYLE
    - Use clear, concise explanations.
    - When explaining difficult concepts, use simple examples aimed at university educators.
+   - When describing workflows, display the steps as a vertical list with emoji bullet points. Use bold headers for the action on each bullet, followed by details. Put "Tools" and "Why" on separate lines under the header.
 
-You can acces the knowledge base in the following JSON. Parse it carefully and use it as the sole source of truth. Do NOT invent tools or workflows that are not in this JSON.
-
-KNOWLEDGE BASE JSON:
-${kbJsonText}
+KNOWLEDGE BASE (sole source of truth):
+${knowledgeBase}
       `.trim();
+    }
 
+    function initMessages() {
       messages = [
         {
           role: "system",
-          content: systemPrompt,
+          content: buildSystemPrompt(),
         },
       ];
     }
@@ -273,10 +312,23 @@ ${kbJsonText}
     // Initialise messages on load
     initMessages();
 
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function formatMessage(content) {
+      const escaped = escapeHtml(content);
+      const withBold = escaped.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+      return withBold.replace(/\n/g, "<br>");
+    }
+
     function addMessage(role, content) {
       const div = document.createElement("div");
       div.className = `msg ${role}`;
-      div.textContent = content;
+      div.innerHTML = formatMessage(content);
       chatLog.appendChild(div);
       chatLog.scrollTop = chatLog.scrollHeight;
     }
@@ -404,336 +456,6 @@ You do not have to go through this alone — please reach out to someone you tru
     });
   </script>
 
-  <!-- Embedded knowledge base JSON -->
-  <script id="knowledge-base" type="application/json">
-{
-  "meta": {
-    "title": "AI tools for teaching: Which ones are helpful and how should I use them?",
-    "overview": "This resource explains how different AI tools can support university teaching. It includes example workflows for refreshing or redeveloping a course, and an 'AI Tools Impact Matrix' where tools are scored for teacher helpfulness, student helpfulness, and learning curve."
-  },
-  "scoring_system": {
-    "dimensions": {
-      "teacher_helpfulness": {
-        "description": "How useful the tool is for teachers (e.g., saving time, improving quality). Higher is better.",
-        "scale": "0–100"
-      },
-      "student_helpfulness": {
-        "description": "How much the tool improves the student learning experience. Higher is better.",
-        "scale": "0–100"
-      },
-      "learning_curve": {
-        "description": "How hard the tool is to learn. 1 = very easy, 10 = very hard.",
-        "scale": "1–10",
-        "color_mapping": "Green = easier tools (lower score), Red = harder tools (higher score)."
-      }
-    },
-    "chart_explanation": "The butterfly chart shows teacher helpfulness on the left side and student helpfulness on the right side of a central vertical line. Bar color indicates learning curve (green = easy, red = hard)."
-  },
-  "workflows": [
-    {
-      "id": "rapid_course_refresh",
-      "label": "I need to quickly update a course in the minimum amount of time!",
-      "name": "Rapid course refresh",
-      "steps": [
-        "Gather any content that is relevant for an AI tool to know (e.g. transcripts of current course content, policy guidelines, course outline). If transcripts are poor, you can first improve them using TURBOSCRIBE. Where possible, work one week at a time to reduce errors.",
-        "Upload this content to a MAINSTREAM LLM (e.g. Gemini or ChatGPT) in a deep-reasoning mode and ask it to review the information and update the course content. This usually takes 10+ minutes and generates a thorough report.",
-        "Ask the LLM to create a slide transcript for an XX-minute PowerPoint presentation you will record, with no more than 10 slides per recording (if using a free version). This transcript acts like a teleprompter script.",
-        "Upload the transcript/content to GAMMA and have it generate slides for you. Adjust settings and image options until the slides are acceptable, then export to PowerPoint and tweak if needed.",
-        "Record your presentation in your preferred screen recorder (e.g. Loom), using the slides and transcript you generated.",
-        "Upload the video and teleprompter text to your LMS (e.g. Canvas)."
-      ],
-      "notes": [
-        "Check the accuracy of outputs at every stage.",
-        "You can use OPENROUTER to obtain a consensus across multiple models on your content, but you still need a human-in-the-loop to verify correctness."
-      ],
-      "tools_highlighted": ["Turboscribe", "Mainstream LLMs", "Gamma", "Openrouter"]
-    },
-    {
-      "id": "make_course_interactive",
-      "label": "I saved time updating the course – now I want to explore making it more interactive.",
-      "name": "Make the course interactive",
-      "description": "Use the AI Tools Impact Matrix (butterfly chart) to select tools that can make the course more interactive. Tools are ranked subjectively for teacher helpfulness (left of centre) and student helpfulness (right of centre). Bar color indicates learning curve (green = easy, red = steep). Scores near 100 indicate highly recommended tools.",
-      "recommendation": "Start by exploring tools with high student helpfulness and manageable learning curves, then integrate them into activities, interactive content, and feedback systems."
-    },
-    {
-      "id": "full_course_redevelopment",
-      "label": "I want to completely redevelop the course from the ground up.",
-      "name": "Full course redevelopment",
-      "steps": [
-        "Use OPENROUTER or another powerful LLM setup to help you develop a detailed course plan.",
-        "Generate core materials using your own expertise supported by a MAINSTREAM LLM (e.g. Gemini, ChatGPT, Claude).",
-        "Provide these materials to NOTEBOOKLM in a suitable format, and use it to generate transcripts, slide content, quizzes, podcasts, mind maps, and other learning resources.",
-        "Share the NotebookLM notebook with students (on a paid plan) so they can access the curated content.",
-        "Consider building a student-facing chatbot using ELEVENLABS (for high-quality voice interaction) or COGNITI (if Canvas/institution integration is preferred).",
-        "For interactive activities (e.g. simulations, games, practice assessments), use the coding capabilities of a MAINSTREAM LLM or more specialised tools like CODEX to help build custom interactive content."
-      ],
-      "notes": [
-        "This workflow assumes you are doing a major redesign rather than a light refresh.",
-        "High-impact elements: a well-designed NotebookLM notebook, custom chatbots, and purpose-built interactives built with coding-capable tools."
-      ],
-      "tools_highlighted": [
-        "Openrouter",
-        "Mainstream LLMs",
-        "NotebookLM",
-        "ElevenLabs",
-        "Cogniti",
-        "Codex"
-      ]
-    }
-  ],
-  "tools": [
-    {
-      "name": "Atlas",
-      "category": "Learning & Edu Assistants",
-      "teacher_helpfulness": 0,
-      "student_helpfulness": 90,
-      "learning_curve": 1,
-      "note_short": "Used by 1M+ students.",
-      "description": "A study assistant used by more than 1,000,000 students that integrates directly with course materials via RAG training. Students describe it as significantly better than ChatGPT and, for some, the only reason they are passing classes. It helps students study, write, and solve faster and score higher. The major limitation for teachers is that you cannot control the information the students are using or seeing, and it bypasses your control over the content. A better approach for staff is often to create your own superior learning support (e.g. NotebookLM notebooks or custom Gemini GEMs / ChatGPT custom GPTs).",
-      "video_url": null
-    },
-    {
-      "name": "Gamma",
-      "category": "Learning & Edu Assistants",
-      "teacher_helpfulness": 90,
-      "student_helpfulness": 50,
-      "learning_curve": 1,
-      "note_short": "Uses AI to generate slides/websites/social media.",
-      "description": "An AI slide, website, and social media content generator. You can feed it information and it will generate slides that can then be turned into interactive webpages or social posts. It is powerful when you need to make major course modifications, as it produces visually appealing slides with many customisation options. It is currently superior to Microsoft Copilot in PowerPoint or NotebookLM slide generation. The free version is quite restricted but the paid versions are reasonably priced given the productivity boost. It may not always create better slides than a human, but it is much faster.",
-      "video_url": "https://www.loom.com/share/0f2f9f9957c94827af3198b178db99ca"
-    },
-    {
-      "name": "Vids (Google)",
-      "category": "Learning & Edu Assistants",
-      "teacher_helpfulness": 75,
-      "student_helpfulness": 75,
-      "learning_curve": 5,
-      "note_short": "AI-assisted video creation, including screen capture and teleprompter.",
-      "description": "An AI-powered video creation tool integrated with Gemini that includes screen recording, teleprompter functionality, and other features. It helps scale communication by suggesting scripts and producing professional voice-overs. However, in teaching contexts there are questions about whether tools that reduce or remove human visibility to students are always appropriate.",
-      "video_url": null
-    },
-    {
-      "name": "NotebookLM",
-      "category": "Learning & Edu Assistants",
-      "teacher_helpfulness": 100,
-      "student_helpfulness": 100,
-      "learning_curve": 2,
-      "note_short": "Turn your content into podcasts, slides, quizzes, videos etc. and share it with your students.",
-      "description": "A very powerful teaching and learning tool. You create 'Notebooks' based on content you provide (or that it finds if you permit), and NotebookLM can turn this into short videos, interactive podcasts, mind maps, presentation slides, quizzes, flash cards, and more. It also acts as a chatbot over your sources. As a teacher you can generate slide content and scripts for what you will say, then tweak them. You can share a Notebook with students (on a paid account) so they can access the generated content. The main limitation is that you cannot see what your students are asking it.",
-      "video_url": "https://www.loom.com/share/19c9bdeadfa6428d8c4aad585e259ea8"
-    },
-    {
-      "name": "Custom GPTs",
-      "category": "General LLMs",
-      "teacher_helpfulness": 100,
-      "student_helpfulness": 100,
-      "learning_curve": 4,
-      "note_short": "Creates 'agents' with specific instructions and information.",
-      "description": "Standard LLMs such as ChatGPT, Gemini, or Claude configured and trained on your specific content. You can give them role instructions and attach documents so they act as assignment draft reviewers, course helpers, Socratic tutors, storytellers, or practical assessment training tools. Gemini GEMs are available on the free plan, making them highly accessible.",
-      "video_url": null
-    },
-    {
-      "name": "Openrouter",
-      "category": "General LLMs",
-      "teacher_helpfulness": 100,
-      "student_helpfulness": 75,
-      "learning_curve": 3,
-      "note_short": "Compare responses from multiple AI models at the same time, including with प्रशिक्षण information.",
-      "description": "A very powerful tool that lets you query multiple LLMs at once, including many that are free and can be given training data and instructions. It acts like a panel of experts, helping you rapidly identify model errors and generate consensus content, even in the free version. More advanced usage lets you turn these models into chatbots, storytellers, admin assistants, and more for your course. It is hard to give up once you have integrated it into your workflow.",
-      "video_url": "https://www.loom.com/share/e7f636eecd144bc3bc44bcaaf5246535"
-    },
-    {
-      "name": "Mainstream LLMs",
-      "category": "General LLMs",
-      "teacher_helpfulness": 100,
-      "student_helpfulness": 50,
-      "learning_curve": 1,
-      "note_short": "Typical generative AI tools such as ChatGPT, Claude, and Gemini.",
-      "description": "The standard, general-purpose LLMs most people think of when they think of generative AI. They are extraordinarily powerful and increasingly reliable, though they can still make errors and hallucinate. Custom-trained versions and tools like NotebookLM often make better teaching and learning tools, but mainstream LLMs remain essential. As of November 2025, ChatGPT, Gemini, and Claude are all excellent; choice depends on what extra features you need. For example, a ChatGPT subscription includes Codex (very strong for coding), Gemini includes Flow (a leading video model in Australia), and Claude offers 'Artifacts' for easy creation of interactive games and puzzles. Features like 'Deep Research' in Gemini or ChatGPT can produce very detailed analyses.",
-      "video_url": "https://www.loom.com/share/73607c5d2b0741c79d2d842ae4f4e87e"
-    },
-    {
-      "name": "Cogniti",
-      "category": "General LLMs",
-      "teacher_helpfulness": 60,
-      "student_helpfulness": 50,
-      "learning_curve": 3,
-      "note_short": "A Canvas-integrated chatbot platform for basic use cases.",
-      "description": "An AI teaching system for building custom chatbot agents. Major strengths: free for academics where a university license exists, and provides data on student interactions. Weaknesses: uses older models, training and interaction quality is not as strong as commercial chatbot platforms like ElevenLabs, Chatbase, or Zapier; voice is limited or absent; and the student interface is less polished. It also cannot compete with NotebookLM, custom GPTs, or Gemini GEMs as a shareable learning tool. It is, however, a decent introductory AI tool for institutions, especially when university-supported, but students may bypass it if the experience is not good.",
-      "video_url": null
-    },
-    {
-      "name": "Copilot (Enterprise)",
-      "category": "General LLMs",
-      "teacher_helpfulness": 90,
-      "student_helpfulness": 50,
-      "learning_curve": 5,
-      "note_short": "Summarisation and slide creation.",
-      "description": "The full version of Microsoft Copilot is a powerful tool for summarising emails, generating PowerPoint slides, and similar tasks. Staff often have limited access to the full version. When available, it is very useful because it is privacy-protected, so you can safely provide data that you would not want to send to consumer tools.",
-      "video_url": null
-    },
-    {
-      "name": "Copilot (Standard)",
-      "category": "General LLMs",
-      "teacher_helpfulness": 30,
-      "student_helpfulness": 30,
-      "learning_curve": 2,
-      "note_short": "Basic summarisation/slides.",
-      "description": "The standard version of Copilot is generally less useful than other free or paid models. Its main advantage is built-in privacy protections, which may make it suitable for some sensitive use cases.",
-      "video_url": null
-    },
-    {
-      "name": "Antigravity",
-      "category": "Coding & Dev",
-      "teacher_helpfulness": 40,
-      "student_helpfulness": 40,
-      "learning_curve": 7,
-      "note_short": "Google IDE for coding; niche and best suited to people interested in code.",
-      "description": "Google’s AI-enhanced coding IDE built on VS Code. It focuses on productivity, supporting accelerated code development with integrated screen recordings, browser testing, and Google Docs-style comments/markup on walkthroughs. Google’s models are currently strong for front-end coding (what users see) rather than back-end systems.",
-      "video_url": null
-    },
-    {
-      "name": "Jules",
-      "category": "Coding & Dev",
-      "teacher_helpfulness": 25,
-      "student_helpfulness": 25,
-      "learning_curve": 10,
-      "note_short": "Asynchronous coding agent; weaker than competitors.",
-      "description": "An async coding agent for 'builders running agents at scale'. It takes on tasks like bug fixing, version bumps, writing tests, and building features (often via GitHub issues). With newer tools like Codex, Cursor, and Antigravity, Jules may be becoming obsolete.",
-      "video_url": null
-    },
-    {
-      "name": "Codex",
-      "category": "Coding & Dev",
-      "teacher_helpfulness": 90,
-      "student_helpfulness": 90,
-      "learning_curve": 10,
-      "note_short": "Extremely powerful coding tool; steep learning curve.",
-      "description": "A very specialised but extraordinary coding assistant. It supports 'vibe coding' where you can describe what you want in natural language and get working code with minimal programming experience. It is one of the best tools for building interactive content for students. It would score 100 for both teachers and students if not for the steep learning curve.",
-      "video_url": null
-    },
-    {
-      "name": "HuggingFace",
-      "category": "Coding & Dev",
-      "teacher_helpfulness": 60,
-      "student_helpfulness": 40,
-      "learning_curve": 10,
-      "note_short": "Where many advanced AI models live; most relevant to programmers.",
-      "description": "A platform hosting cutting-edge AI models and tools. Many new and experimental models appear here first. It is most useful for developers who are comfortable with APIs, MCPs, and experimental workflows. Nearly all frontier AI work appears here before entering mainstream products.",
-      "video_url": null
-    },
-    {
-      "name": "Hedra Studio",
-      "category": "Generative Media",
-      "teacher_helpfulness": 30,
-      "student_helpfulness": 30,
-      "learning_curve": 5,
-      "note_short": "AI video/audio/image creation.",
-      "description": "A visual-first platform for AI video, audio, and image generation that aims to enhance storytelling. It is not yet clear what advantages it offers over Google’s Flow interface for Veo.",
-      "video_url": null
-    },
-    {
-      "name": "Flow (Veo 3.1)",
-      "category": "Generative Media",
-      "teacher_helpfulness": 30,
-      "student_helpfulness": 100,
-      "learning_curve": 8,
-      "note_short": "Photorealistic video creation that can persist characters and scenes; hard to use well.",
-      "description": "Flow is an interface for creating videos using Veo 3.1. It can produce photorealistic videos where characters and backgrounds persist across multiple clips. This makes it useful for branching narrative storylines, 'spot the error' videos, and content that periodically needs updating (you can regenerate scenes instead of reshooting a person in the same clothes). It would score higher if it were easier to learn and less time-intensive to use without APIs.",
-      "video_url": "https://www.loom.com/share/3a20f4ab3ca341038743a2a296f8251c"
-    },
-    {
-      "name": "Lyria RealTime",
-      "category": "Generative Media",
-      "teacher_helpfulness": 20,
-      "student_helpfulness": 20,
-      "learning_curve": 10,
-      "note_short": "Real-time music generation.",
-      "description": "An experimental real-time streaming music generation model accessible via the Gemini API. It creates instrumental music that can be steered using prompts specifying instruments, genre, and mood. It could be useful for designing custom music for specific settings, such as personalised relaxation tracks.",
-      "video_url": null
-    },
-    {
-      "name": "Marble",
-      "category": "Generative Media",
-      "teacher_helpfulness": 10,
-      "student_helpfulness": 10,
-      "learning_curve": 8,
-      "note_short": "Create 3D worlds; currently more 'cool' than practical.",
-      "description": "A visual platform for creating high-fidelity, persistent 3D environments ('worlds') from text prompts, images, video, panoramas, or 3D structure inputs. It includes Studio tools like 'Pano Edit' and 'Compose' for connecting worlds. Its educational utility is not yet clear and it requires significant effort for limited current payoff, but it hints at future uses such as simulated hospitals, gyms, and other environments.",
-      "video_url": null
-    },
-    {
-      "name": "MedGemma-27B",
-      "category": "Specialized & Domain",
-      "teacher_helpfulness": 70,
-      "student_helpfulness": 70,
-      "learning_curve": 10,
-      "note_short": "Medically-trained AI model.",
-      "description": "Google’s impressive medically-trained AI model used for generating case notes, supporting diagnosis, and similar tasks in medical education. It is extraordinarily powerful and could score 100 for health fields if access were easier. Currently available via HuggingFace with a paid account required to unlock full capability, and typically accessed via API, which requires coding skills.",
-      "video_url": "https://www.loom.com/share/b35f718f24494355b65b2272d20dbd18"
-    },
-    {
-      "name": "ElevenLabs",
-      "category": "Specialized & Domain",
-      "teacher_helpfulness": 80,
-      "student_helpfulness": 100,
-      "learning_curve": 3,
-      "note_short": "Voice models and voice-based chatbots.",
-      "description": "A leading platform for lifelike voice models and voice-based chatbots with minimal lag. It provides an extremely realistic alternative to video avatars and is less constrained by compute. ElevenLabs is state-of-the-art for text-to-speech and conversational voice agents, widely used by large companies and podcasters. Its realism makes it excellent for teaching client interaction skills.",
-      "video_url": null
-    },
-    {
-      "name": "Turboscribe",
-      "category": "Specialized & Domain",
-      "teacher_helpfulness": 80,
-      "student_helpfulness": 80,
-      "learning_curve": 1,
-      "note_short": "Speech-to-text transcription.",
-      "description": "Provides highly accurate speech-to-text transcription for recorded lectures, research meetings, and similar audio. It is particularly useful for quickly transcribing long sessions that can then be searched, annotated, or fed into other AI tools to generate interactive content. For someone inheriting a course, it is a powerful way to obtain usable text from existing videos.",
-      "video_url": "https://www.loom.com/share/493e767a0efe455f871dc8cb0e014d6f"
-    },
-    {
-      "name": "Scite.ai",
-      "category": "Specialized & Domain",
-      "teacher_helpfulness": 90,
-      "student_helpfulness": 70,
-      "learning_curve": 3,
-      "note_short": "AI-enhanced scientific literature search and citation analysis.",
-      "description": "An AI tool that evaluates how a paper is cited in the literature, labelling citations as supporting, contradicting, or mentioning. It helps you quickly gauge the strength of evidence behind specific claims. It integrates with many academic databases and publishing platforms and is very useful for evidence-based teaching and research.",
-      "video_url": null
-    },
-    {
-      "name": "Opal",
-      "category": "Workflow & Design",
-      "teacher_helpfulness": 65,
-      "student_helpfulness": 70,
-      "learning_curve": 3,
-      "note_short": "No-code AI app builder.",
-      "description": "A no-code platform for building AI-powered apps and workflows. It can automate complex multi-step processes, such as streamlining research tasks or creating custom report generators and quiz tools. It is powerful but some overlapping capabilities are already available in Gemini and especially Claude, so it may be a niche choice depending on your stack.",
-      "video_url": null
-    },
-    {
-      "name": "Gradescope",
-      "category": "Workflow & Design",
-      "teacher_helpfulness": 100,
-      "student_helpfulness": 50,
-      "learning_curve": 5,
-      "note_short": "AI-assisted marking of assessments.",
-      "description": "An AI-assisted marking platform for exams, worksheets, diagrams, coding tasks, and handwritten work. It is particularly strong in large-enrolment courses where speed and consistency are important. There are active ethical debates about whether it is more ethical to use such tools (because they may be fairer) or not to use them, but it is definitely worth exploring.",
-      "video_url": null
-    },
-    {
-      "name": "Figma AI",
-      "category": "Workflow & Design",
-      "teacher_helpfulness": 60,
-      "student_helpfulness": 40,
-      "learning_curve": 6,
-      "note_short": "Design and prototyping tools with AI support.",
-      "description": "Useful for learning-design teams creating interfaces, diagrams, interactive learning tools, and simulations. Figma’s AI features can significantly speed up layout, prototyping, and visual iteration. A good pattern is to design the layout for an interactive experience in Figma, then ask Codex or a standard LLM to generate the code that implements it.",
-      "video_url": null
-    }
-  ]
-}
-  </script>
+  
 </body>
 </html>
