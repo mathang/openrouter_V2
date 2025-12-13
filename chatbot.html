@@ -107,14 +107,12 @@
     <section class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 shadow-sm space-y-3">
       <p class="text-sm text-slate-200">Select none, one or both to make the chatbot focus on sports, clinical or sports-related clinical examples</p>
       <div class="flex flex-wrap gap-3">
-        <button id="clinical-toggle" type="button" class="focus:outline-none relative overflow-hidden rounded-xl border border-slate-700 bg-slate-800/60 transition hover:-translate-y-0.5 hover:border-indigo-500/70 active:scale-[0.99]">
-          <img src="./clinical.png" alt="Clinical focus" class="w-16 h-16 object-cover" />
-          <span class="absolute inset-0 rounded-xl ring-2 ring-indigo-500/0 transition-all duration-200 pointer-events-none" aria-hidden="true"></span>
+        <button id="clinical-toggle" type="button" class="focus:outline-none relative overflow-hidden rounded-xl border border-slate-700 bg-slate-800/60 transition hover:-translate-y-0.5 hover:border-indigo-500/70 active:scale-[0.99] p-2">
+          <img src="./clinical.png" alt="Clinical focus" class="w-24 h-24 object-cover rounded-lg" />
           <span class="sr-only">Toggle clinical focus</span>
         </button>
-        <button id="sports-toggle" type="button" class="focus:outline-none relative overflow-hidden rounded-xl border border-slate-700 bg-slate-800/60 transition hover:-translate-y-0.5 hover:border-indigo-500/70 active:scale-[0.99]">
-          <img src="./sports.png" alt="Sports focus" class="w-16 h-16 object-cover" />
-          <span class="absolute inset-0 rounded-xl ring-2 ring-indigo-500/0 transition-all duration-200 pointer-events-none" aria-hidden="true"></span>
+        <button id="sports-toggle" type="button" class="focus:outline-none relative overflow-hidden rounded-xl border border-slate-700 bg-slate-800/60 transition hover:-translate-y-0.5 hover:border-indigo-500/70 active:scale-[0.99] p-2">
+          <img src="./sports.png" alt="Sports focus" class="w-24 h-24 object-cover rounded-lg" />
           <span class="sr-only">Toggle sports focus</span>
         </button>
       </div>
@@ -438,17 +436,19 @@ ${knowledgeBase}
     }
 
     function setToggleState(button, isActive) {
-      const ring = button.querySelector(".ring-2");
       button.setAttribute("aria-pressed", isActive);
-      if (isActive) {
-        ring.classList.remove("ring-indigo-500/0");
-        ring.classList.add("ring-indigo-500/80");
-        button.classList.add("border-indigo-500/70", "bg-indigo-500/10", "shadow-lg", "shadow-indigo-500/20");
-      } else {
-        ring.classList.add("ring-indigo-500/0");
-        ring.classList.remove("ring-indigo-500/80");
-        button.classList.remove("border-indigo-500/70", "bg-indigo-500/10", "shadow-lg", "shadow-indigo-500/20");
-      }
+      const highlightClasses = [
+        "ring-4",
+        "ring-offset-2",
+        "ring-offset-slate-900",
+        "ring-yellow-400",
+        "border-yellow-400",
+        "bg-yellow-500/10",
+        "shadow-lg",
+        "shadow-yellow-500/40",
+      ];
+
+      highlightClasses.forEach((cls) => button.classList.toggle(cls, isActive));
     }
 
     function updatePendingFocusInstruction() {
