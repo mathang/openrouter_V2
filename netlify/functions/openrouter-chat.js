@@ -57,35 +57,39 @@ exports.handler = async (event, context) => {
           model: "google/gemma-3-27b-it:free",
           messages,
           temperature: 0.4,
+          stream: true,
         }),
       }
     );
 
-    const text = await openrouterRes.text();
-    let data = null;
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      // Non-JSON from OpenRouter
-    }
-
     if (!openrouterRes.ok) {
-      console.error("OpenRouter error:", data || text);
+      const errorText = await openrouterRes.text();
+      let data = null;
+      try {
+        data = JSON.parse(errorText);
+      } catch (e) {
+        // Non-JSON from OpenRouter
+      }
+      console.error("OpenRouter error:", data || errorText);
       return {
         statusCode: openrouterRes.status,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          error: data && data.error ? data.error : text || "Unknown error",
+          error: data && data.error ? data.error : errorText || "Unknown error",
         }),
       };
     }
 
-    // Success
-    return {
-      statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data ?? { raw: text }),
+    const streamHeaders = {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
     };
+
+    return new Response(openrouterRes.body, {
+      status: 200,
+      headers: streamHeaders,
+    });
   } catch (err) {
     console.error("OpenRouter request failed:", err);
     return {
