@@ -77,9 +77,9 @@
   <header class="flex-none bg-slate-900/80 backdrop-blur-md border-b border-slate-800 p-4 flex items-center gap-4 z-20 shadow-lg">
     <div class="relative group cursor-pointer">
       <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full blur opacity-50 group-hover:opacity-100 transition duration-500"></div>
-      <img 
-        src="https://www.rehabtools.org/uploads/5/4/2/3/54237171/ross-clark_orig.jpg" 
-        alt="Ross Clark" 
+      <img
+        src="./ross pic.png"
+        alt="Ross Clark"
         class="relative w-12 h-12 rounded-full object-cover border-2 border-slate-900"
         onerror="this.src='https://ui-avatars.com/api/?name=Ross+Clark&background=6366f1&color=fff'"
       />
@@ -102,10 +102,27 @@
 
   <!-- Chat Log -->
   <main id="chat-log" class="flex-1 overflow-y-auto custom-scroll p-4 space-y-6 scroll-smooth">
+
+    <!-- Focus Toggles -->
+    <section class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 shadow-sm space-y-3">
+      <p class="text-sm text-slate-200">Select none, one or both to make the chatbot focus on sports, clinical or sports-related clinical examples</p>
+      <div class="flex flex-wrap gap-3">
+        <button id="clinical-toggle" type="button" class="focus:outline-none relative overflow-hidden rounded-xl border border-slate-700 bg-slate-800/60 transition hover:-translate-y-0.5 hover:border-indigo-500/70 active:scale-[0.99]">
+          <img src="./clinical.png" alt="Clinical focus" class="w-16 h-16 object-cover" />
+          <span class="absolute inset-0 rounded-xl ring-2 ring-indigo-500/0 transition-all duration-200 pointer-events-none" aria-hidden="true"></span>
+          <span class="sr-only">Toggle clinical focus</span>
+        </button>
+        <button id="sports-toggle" type="button" class="focus:outline-none relative overflow-hidden rounded-xl border border-slate-700 bg-slate-800/60 transition hover:-translate-y-0.5 hover:border-indigo-500/70 active:scale-[0.99]">
+          <img src="./sports.png" alt="Sports focus" class="w-16 h-16 object-cover" />
+          <span class="absolute inset-0 rounded-xl ring-2 ring-indigo-500/0 transition-all duration-200 pointer-events-none" aria-hidden="true"></span>
+          <span class="sr-only">Toggle sports focus</span>
+        </button>
+      </div>
+    </section>
     
     <!-- Welcome Message -->
     <div class="flex gap-4">
-      <img src="https://www.rehabtools.org/uploads/5/4/2/3/54237171/ross-clark_orig.jpg" class="w-10 h-10 rounded-full object-cover border border-slate-700 flex-none self-end mb-1" alt="Bot">
+      <img src="./ross pic.png" class="w-10 h-10 rounded-full object-cover border border-slate-700 flex-none self-end mb-1" alt="Bot">
       <div class="space-y-1 max-w-[85%]">
         <div class="text-xs text-slate-500 ml-1">Ross Clark</div>
         <div class="msg-bot bg-slate-800 border border-slate-700 p-4 text-sm leading-relaxed shadow-sm">
@@ -121,7 +138,7 @@
   <!-- Typing Indicator (Hidden by default) -->
   <div id="typing-indicator" class="hidden px-4 pb-2">
     <div class="flex gap-4">
-      <img src="https://www.rehabtools.org/uploads/5/4/2/3/54237171/ross-clark_orig.jpg" class="w-8 h-8 rounded-full object-cover border border-slate-700 flex-none self-end opacity-70" alt="Bot">
+      <img src="./ross pic.png" class="w-8 h-8 rounded-full object-cover border border-slate-700 flex-none self-end opacity-70" alt="Bot">
       <div class="msg-bot bg-slate-800/50 border border-slate-700/50 p-3 rounded-2xl rounded-bl-none w-16 flex items-center justify-center h-10">
         <div class="typing-dot"></div>
         <div class="typing-dot"></div>
@@ -168,9 +185,13 @@
     const errorSpan = document.getElementById("error");
     const sendBtn = document.getElementById("send-btn");
     const typingIndicator = document.getElementById("typing-indicator");
+    const clinicalToggle = document.getElementById("clinical-toggle");
+    const sportsToggle = document.getElementById("sports-toggle");
 
     // Full message history
     let messages = [];
+    let focusState = { clinical: false, sports: false };
+    let pendingFocusInstruction = "";
 
     // --- KNOWLEDGE BASE (Restored) ---
     const knowledgeBase = `
@@ -416,6 +437,33 @@ ${knowledgeBase}
       return withBold.replace(/\n/g, "<br>");
     }
 
+    function setToggleState(button, isActive) {
+      const ring = button.querySelector(".ring-2");
+      button.setAttribute("aria-pressed", isActive);
+      if (isActive) {
+        ring.classList.remove("ring-indigo-500/0");
+        ring.classList.add("ring-indigo-500/80");
+        button.classList.add("border-indigo-500/70", "bg-indigo-500/10", "shadow-lg", "shadow-indigo-500/20");
+      } else {
+        ring.classList.add("ring-indigo-500/0");
+        ring.classList.remove("ring-indigo-500/80");
+        button.classList.remove("border-indigo-500/70", "bg-indigo-500/10", "shadow-lg", "shadow-indigo-500/20");
+      }
+    }
+
+    function updatePendingFocusInstruction() {
+      const { clinical, sports } = focusState;
+      if (clinical && sports) {
+        pendingFocusInstruction = "use examples specific to sports related clinical exercise physiology";
+      } else if (clinical) {
+        pendingFocusInstruction = "use an example appropriate to clinical exercise physiology that is not sports related";
+      } else if (sports) {
+        pendingFocusInstruction = "use an example appropriate to sports that is not clinical exercise physiology related";
+      } else {
+        pendingFocusInstruction = "";
+      }
+    }
+
     function addUserMessage(content) {
         const div = document.createElement("div");
         div.className = "flex gap-4 flex-row-reverse animate-[fadeIn_0.3s_ease-out]";
@@ -434,8 +482,8 @@ ${knowledgeBase}
         const div = document.createElement("div");
         div.className = "flex gap-4 animate-[slideIn_0.3s_ease-out]";
         div.innerHTML = `
-             <img src="https://www.rehabtools.org/uploads/5/4/2/3/54237171/ross-clark_orig.jpg" 
-                  class="w-10 h-10 rounded-full object-cover border border-slate-700 flex-none self-end mb-1" 
+             <img src="./ross pic.png"
+                  class="w-10 h-10 rounded-full object-cover border border-slate-700 flex-none self-end mb-1"
                   alt="Ross Clark"
                   onerror="this.src='https://ui-avatars.com/api/?name=Ross+Clark&background=6366f1&color=fff'">
             <div class="space-y-1 max-w-[85%]">
@@ -477,6 +525,23 @@ ${knowledgeBase}
     // Initialise on load
     initMessages();
 
+    // Set initial toggle appearance
+    setToggleState(clinicalToggle, focusState.clinical);
+    setToggleState(sportsToggle, focusState.sports);
+
+    // Focus toggle interactions
+    clinicalToggle.addEventListener("click", () => {
+      focusState.clinical = !focusState.clinical;
+      setToggleState(clinicalToggle, focusState.clinical);
+      updatePendingFocusInstruction();
+    });
+
+    sportsToggle.addEventListener("click", () => {
+      focusState.sports = !focusState.sports;
+      setToggleState(sportsToggle, focusState.sports);
+      updatePendingFocusInstruction();
+    });
+
     // Crisis detection
     function looksLikeCrisis(text) {
       const lowered = text.toLowerCase();
@@ -502,9 +567,13 @@ ${knowledgeBase}
       const userText = textarea.value.trim();
       if (!userText) return;
 
+      const focusPrefix = pendingFocusInstruction ? `${pendingFocusInstruction}. ` : "";
+      const messageToSend = `${focusPrefix}${userText}`.trim();
+      pendingFocusInstruction = "";
+
       // 1. Add user message
       addUserMessage(userText);
-      messages.push({ role: "user", content: userText }); // Update history
+      messages.push({ role: "user", content: messageToSend }); // Update history
       textarea.value = "";
       textarea.style.height = 'auto'; // Reset height
       
