@@ -42,60 +42,100 @@ exports.handler = async (event, context) => {
     };
   }
 
-  try {
-    const openrouterRes = await fetch(
-      "https://openrouter.ai/api/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-          "HTTP-Referer": "https://openrouterchatbot.netlify.app",
-          "X-Title": "AI Tools Teaching Chatbot",
-        },
-        body: JSON.stringify({
-          // model: "google/gemma-3-27b-it:free",   
-          model: "amazon/nova-2-lite-v1:free",
-          // model: "openai/gpt-oss-20b:free",
-          messages,
-          temperature: 0.4,
-        }),
-      }
-    );
+  const models = [
+    "amazon/nova-2-lite-v1:free",
+    "google/gemma-3-27b-it:free",
+    "openai/gpt-oss-20b:free",
+  ];
 
-    const text = await openrouterRes.text();
-    let data = null;
+  const fallbackNotice =
+    "my usual model is struggling with this one - I'm switching to another one. I'll respond soon!";
+
+  let lastError = null;
+
+  for (let i = 0; i < models.length; i++) {
+    const model = models[i];
+
     try {
-      data = JSON.parse(text);
-    } catch (e) {
-      // Non-JSON from OpenRouter
-    }
+      const openrouterRes = await fetch(
+        "https://openrouter.ai/api/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+            "HTTP-Referer": "https://openrouterchatbot.netlify.app",
+            "X-Title": "AI Tools Teaching Chatbot",
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            temperature: 0.4,
+          }),
+        }
+      );
 
-    if (!openrouterRes.ok) {
-      console.error("OpenRouter error:", data || text);
+      const text = await openrouterRes.text();
+      let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        // Non-JSON from OpenRouter
+      }
+
+      if (!openrouterRes.ok) {
+        console.error(`OpenRouter error for ${model}:`, data || text);
+        lastError = {
+          status: openrouterRes.status,
+          body: data || text || "Unknown error",
+        };
+        continue;
+      }
+
+      // Success
+      const usingFallback = i > 0;
+      if (usingFallback) {
+        const existingContent = data?.choices?.[0]?.message?.content;
+        const combinedContent = existingContent
+          ? `${fallbackNotice}\n\n${existingContent}`
+          : fallbackNotice;
+
+        if (data && Array.isArray(data.choices) && data.choices[0]?.message) {
+          data.choices[0].message.content = combinedContent;
+        } else {
+          data = {
+            choices: [
+              {
+                message: {
+                  role: "assistant",
+                  content: combinedContent,
+                },
+              },
+            ],
+          };
+        }
+      }
+
       return {
-        statusCode: openrouterRes.status,
+        statusCode: 200,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          error: data && data.error ? data.error : text || "Unknown error",
-        }),
+        body: JSON.stringify(data ?? { raw: text }),
       };
+    } catch (err) {
+      console.error(`OpenRouter request failed for ${model}:`, err);
+      lastError = { status: 502, body: err.message || "Unknown error" };
+      // Try the next model
     }
-
-    // Success
-    return {
-      statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data ?? { raw: text }),
-    };
-  } catch (err) {
-    console.error("OpenRouter request failed:", err);
-    return {
-      statusCode: 502,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        error: "Failed to contact OpenRouter: " + (err.message || "unknown"),
-      }),
-    };
   }
+
+  // If all models failed
+  const errorBody =
+    (lastError && (lastError.body?.error || lastError.body)) ||
+    "Failed to contact any OpenRouter model.";
+
+  return {
+    statusCode: lastError?.status || 502,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ error: errorBody }),
+  };
 };
