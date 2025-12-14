@@ -54,9 +54,9 @@ exports.handler = async (event, context) => {
           "X-Title": "AI Tools Teaching Chatbot",
         },
         body: JSON.stringify({
-         // model: "google/gemma-3-27b-it:free",   openai/gpt-oss-20b:free
-         // model: "amazon/nova-2-lite-v1:free",
-          model: "openai/gpt-oss-20b:free",
+          // model: "google/gemma-3-27b-it:free",   
+          model: "amazon/nova-2-lite-v1:free",
+          // model: "openai/gpt-oss-20b:free",
           messages,
           temperature: 0.4,
         }),
