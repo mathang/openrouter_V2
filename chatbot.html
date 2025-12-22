@@ -69,6 +69,121 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
+
+    /* Rich text styling for bot replies */
+    .rich-text {
+      color: #e2e8f0;
+    }
+    .rich-text h2,
+    .rich-text h3,
+    .rich-text h4 {
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: #cbd5ff;
+      margin-bottom: 0.35rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .rich-text h2::before,
+    .rich-text h3::before,
+    .rich-text h4::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 9999px;
+      background: linear-gradient(135deg, #818cf8, #c084fc);
+      box-shadow: 0 0 0 6px rgba(129, 140, 248, 0.08);
+    }
+    .rich-text p {
+      margin-bottom: 0.75rem;
+      line-height: 1.7;
+    }
+    .rich-text ul {
+      list-style: none;
+      padding-left: 0;
+      margin: 0.5rem 0 1rem;
+      display: grid;
+      gap: 0.35rem;
+    }
+    .rich-text ul li {
+      position: relative;
+      padding-left: 1.2rem;
+    }
+    .rich-text ul li::before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      top: 0;
+      color: #a5b4fc;
+      font-weight: 700;
+    }
+    .rich-text ol {
+      counter-reset: item;
+      padding-left: 0;
+      margin: 0.5rem 0 1rem;
+      display: grid;
+      gap: 0.35rem;
+    }
+    .rich-text ol li {
+      counter-increment: item;
+      padding-left: 1.6rem;
+      position: relative;
+    }
+    .rich-text ol li::before {
+      content: counter(item) ".";
+      position: absolute;
+      left: 0;
+      top: 0;
+      color: #a5b4fc;
+      font-weight: 700;
+    }
+    .rich-text hr {
+      border: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.4), transparent);
+      margin: 1.5rem 0;
+    }
+    .rich-text table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 12px;
+      overflow: hidden;
+      background: rgba(15, 23, 42, 0.35);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+    }
+    .rich-text th,
+    .rich-text td {
+      padding: 0.65rem 0.9rem;
+      text-align: left;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+    }
+    .rich-text th {
+      background: linear-gradient(90deg, rgba(129, 140, 248, 0.12), rgba(192, 132, 252, 0.05));
+      color: #e0e7ff;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+    }
+    .rich-text tr:last-child td {
+      border-bottom: none;
+    }
+    .rich-text strong {
+      color: #cbd5ff;
+      font-weight: 700;
+    }
+    .rich-text .card-block {
+      background: linear-gradient(145deg, rgba(129, 140, 248, 0.08), rgba(30, 41, 59, 0.6));
+      border: 1px solid rgba(129, 140, 248, 0.35);
+      padding: 1rem;
+      border-radius: 14px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(6px);
+      margin-bottom: 0.9rem;
+    }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-200 h-screen flex flex-col overflow-hidden selection:bg-indigo-500 selection:text-white">
@@ -429,10 +544,126 @@ ${knowledgeBase}
         .replace(/>/g, "&gt;");
     }
 
+    function applyInlineFormatting(text) {
+      const escaped = escapeHtml(text);
+      const bolded = escaped.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+      return bolded.replace(/_(.*?)_/g, "<em>$1</em>");
+    }
+
+    function renderTable(lines, startIndex) {
+      const rows = [];
+      let i = startIndex;
+      while (i < lines.length && lines[i].trim().startsWith("|")) {
+        const row = lines[i]
+          .trim()
+          .replace(/^\||\|$/g, "")
+          .split("|")
+          .map((cell) => applyInlineFormatting(cell.trim()));
+        rows.push(row);
+        i++;
+      }
+
+      let header = [];
+      let body = rows;
+
+      if (rows.length > 1 && rows[1].every((cell) => /^-+$/.test(cell.replace(/<.*?>/g, "")))) {
+        header = rows[0];
+        body = rows.slice(2);
+      }
+
+      const headerHtml = header.length
+        ? `<thead><tr>${header.map((cell) => `<th>${cell}</th>`).join("")}</tr></thead>`
+        : "";
+      const bodyHtml = body
+        .map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`)
+        .join("");
+
+      return { html: `<table class="rich-text-table">${headerHtml}<tbody>${bodyHtml}</tbody></table>`, nextIndex: i - 1 };
+    }
+
     function formatMessage(content) {
-      const escaped = escapeHtml(content);
-      const withBold = escaped.replace(/\*\*(.*?)\*\*/g, "<strong class='text-indigo-300'>$1</strong>");
-      return withBold.replace(/\n/g, "<br>");
+      const lines = content.trim().split("\n");
+      let html = '<div class="rich-text space-y-2">';
+      let inUl = false;
+      let inOl = false;
+
+      const closeLists = () => {
+        if (inUl) {
+          html += "</ul>";
+          inUl = false;
+        }
+        if (inOl) {
+          html += "</ol>";
+          inOl = false;
+        }
+      };
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) {
+          closeLists();
+          continue;
+        }
+
+        // Tables
+        if (line.startsWith("|")) {
+          closeLists();
+          const { html: tableHtml, nextIndex } = renderTable(lines, i);
+          html += tableHtml;
+          i = nextIndex;
+          continue;
+        }
+
+        // Headings
+        if (/^#{1,6}\s+/.test(line)) {
+          closeLists();
+          const level = line.match(/^#+/)[0].length;
+          const text = applyInlineFormatting(line.replace(/^#{1,6}\s+/, ""));
+          html += `<h${Math.min(level + 1, 4)}>${text}</h${Math.min(level + 1, 4)}>`;
+          continue;
+        }
+
+        // Divider
+        if (/^(-\s*){3,}$/.test(line)) {
+          closeLists();
+          html += "<hr/>";
+          continue;
+        }
+
+        // Ordered List
+        const orderedMatch = line.match(/^\d+\.\s+(.*)/);
+        if (orderedMatch) {
+          if (!inOl) {
+            closeLists();
+            inOl = true;
+            html += '<ol class="pl-4">';
+          }
+          html += `<li>${applyInlineFormatting(orderedMatch[1])}</li>`;
+          continue;
+        }
+
+        // Unordered List
+        const unorderedMatch = line.match(/^[-*]\s+(.*)/);
+        if (unorderedMatch) {
+          if (!inUl) {
+            closeLists();
+            inUl = true;
+            html += '<ul class="pl-4">';
+          }
+          html += `<li>${applyInlineFormatting(unorderedMatch[1])}</li>`;
+          continue;
+        }
+
+        // Paragraph / Card block
+        closeLists();
+        const paragraph = applyInlineFormatting(line);
+        const isEmphasized = paragraph.startsWith("<strong>") || paragraph.toLowerCase().startsWith("note:");
+        html += `<div class="${isEmphasized ? "card-block" : ""}"><p>${paragraph}</p></div>`;
+      }
+
+      closeLists();
+      html += "</div>";
+      return html;
     }
 
     function setToggleState(button, isActive) {
