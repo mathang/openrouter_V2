@@ -565,7 +565,10 @@ ${knowledgeBase}
     }
 
     function applyInlineFormatting(text) {
-      const cleaned = text.replace(/<br\s*\/?>/gi, " ");
+      const cleaned = text
+        .replace(/<br\s*\/?>/gi, " ")
+        .replace(/\u00a0|&nbsp;/gi, " ")
+        .replace(/\s{2,}/g, " ");
       const escaped = escapeHtml(cleaned);
       const bolded = escaped.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
       return bolded.replace(/_(.*?)_/g, "<em>$1</em>");
