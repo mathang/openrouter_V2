@@ -488,13 +488,14 @@ ${knowledgeBase}
                   onerror="this.src='https://ui-avatars.com/api/?name=Ross+Clark&background=6366f1&color=fff'">
             <div class="space-y-1 max-w-[85%]">
                 <div class="text-xs text-slate-500 ml-1">Ross Clark</div>
-                <div class="msg-bot bg-slate-800 border border-slate-700 p-4 text-sm leading-relaxed shadow-sm text-slate-200">
+                <div class="msg-bot bg-slate-800 border border-slate-700 p-4 text-sm leading-relaxed shadow-sm text-slate-200" data-role="bot-content">
                     ${formatMessage(content)}
                 </div>
             </div>
         `;
         chatLog.appendChild(div);
         chatLog.scrollTop = chatLog.scrollHeight;
+        return div.querySelector("[data-role='bot-content']");
     }
 
     function setTyping(isTyping) {
@@ -559,6 +560,97 @@ ${knowledgeBase}
       <br><br>You do not have to go through this alone.`;
     }
 
+    async function streamAssistantResponse() {
+      const botContentEl = addBotMessage("");
+      const decoder = new TextDecoder();
+      let assistantContent = "";
+      let buffer = "";
+      let streamEnded = false;
+
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages, stream: true }),
+      });
+
+      if (!response.ok) {
+        const rawText = await response.text();
+        let backendMsg = "The server returned an error.";
+        try {
+          const parsed = JSON.parse(rawText);
+          if (parsed?.error) {
+            backendMsg =
+              typeof parsed.error === "string"
+                ? parsed.error
+                : parsed.error.message || backendMsg;
+          }
+        } catch (e) {
+          // ignore
+        }
+        errorSpan.textContent = "Error: " + backendMsg;
+        botContentEl.innerHTML = formatMessage("Sorry, I couldn't generate a response just now.");
+        return assistantContent;
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error("Readable stream not available");
+      }
+
+      while (!streamEnded) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        while (true) {
+          const lineEnd = buffer.indexOf("\n");
+          if (lineEnd === -1) break;
+
+          const line = buffer.slice(0, lineEnd).trim();
+          buffer = buffer.slice(lineEnd + 1);
+
+          if (!line || line.startsWith(":")) continue;
+          if (!line.startsWith("data: ")) continue;
+
+          const dataStr = line.slice(6);
+          if (dataStr === "[DONE]") {
+            streamEnded = true;
+            break;
+          }
+
+          try {
+            const parsed = JSON.parse(dataStr);
+
+            if (parsed?.error) {
+              const msg =
+                parsed.error?.message || "An error occurred during streaming.";
+              errorSpan.textContent = "Error: " + msg;
+              streamEnded = true;
+              break;
+            }
+
+            const delta = parsed?.choices?.[0]?.delta?.content || "";
+            if (delta) {
+              assistantContent += delta;
+              botContentEl.innerHTML = formatMessage(assistantContent);
+              chatLog.scrollTop = chatLog.scrollHeight;
+            }
+
+            const finishReason = parsed?.choices?.[0]?.finish_reason;
+            if (finishReason === "stop" || finishReason === "length") {
+              streamEnded = true;
+              break;
+            }
+          } catch (err) {
+            // Ignore malformed SSE payloads
+          }
+        }
+      }
+
+      return assistantContent;
+    }
+
     // Form Submission
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -590,40 +682,14 @@ ${knowledgeBase}
         return;
       }
 
-      // 3. Backend Call (Restored)
+      // 3. Backend Call with streaming
       try {
-        const response = await fetch(API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages }),
-        });
-
-        const rawText = await response.text();
-        let data = null;
-        try {
-          data = JSON.parse(rawText);
-        } catch (e) {
-          console.error("Non-JSON response from backend:", rawText);
+        const assistantReply = await streamAssistantResponse();
+        if (assistantReply) {
+          messages.push({ role: "assistant", content: assistantReply });
         }
-
-        if (!response.ok) {
-          console.error("Backend error:", data || rawText);
-          let backendMsg = "The server returned an error.";
-          if (data && data.error) backendMsg = typeof data.error === "string" ? data.error : data.error.message;
-          
-          errorSpan.textContent = "Error: " + backendMsg;
-          setTyping(false);
-          return;
-        }
-
-        const reply = data?.choices?.[0]?.message?.content || "Sorry, I couldn't generate a response just now.";
-
-        addBotMessage(reply);
-        messages.push({ role: "assistant", content: reply });
-
       } catch (err) {
         console.error(err);
-        setTyping(false);
         errorSpan.textContent = "Network error connecting to backend.";
       } finally {
         setTyping(false);

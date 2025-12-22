@@ -33,7 +33,7 @@ exports.handler = async (event, context) => {
     };
   }
 
-  const { messages } = body || {};
+  const { messages, stream: streamRequested } = body || {};
   if (!Array.isArray(messages)) {
     return {
       statusCode: 400,
@@ -41,6 +41,21 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({ error: "Missing 'messages' array" }),
     };
   }
+
+  const encoder = new TextEncoder();
+  const buildFallbackChunk = (content, model) =>
+    `data: ${JSON.stringify({
+      id: "fallback-notice",
+      object: "chat.completion.chunk",
+      model,
+      choices: [
+        {
+          index: 0,
+          delta: { content },
+          finish_reason: null,
+        },
+      ],
+    })}\n\n`;
 
   const models = [
     "openai/gpt-oss-20b:free",
@@ -50,39 +65,50 @@ exports.handler = async (event, context) => {
   const fallbackNotice =
     "my usual model is struggling with this one - I'm switching to another one. I'll respond soon!";
 
+  const makeOpenRouterRequest = async (model, wantsStream) => {
+    const payload = {
+      model,
+      messages,
+      temperature: 0.4,
+    };
+
+    if (wantsStream) {
+      payload.stream = true;
+      payload.stream_options = { include_usage: true };
+    }
+
+    return fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        "HTTP-Referer": "https://openrouterchatbot.netlify.app",
+        "X-Title": "AI Tools Teaching Chatbot",
+      },
+      body: JSON.stringify(payload),
+    });
+  };
+
   let lastError = null;
 
   for (let i = 0; i < models.length; i++) {
     const model = models[i];
 
     try {
-      const openrouterRes = await fetch(
-        "https://openrouter.ai/api/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-            "HTTP-Referer": "https://openrouterchatbot.netlify.app",
-            "X-Title": "AI Tools Teaching Chatbot",
-          },
-          body: JSON.stringify({
-            model,
-            messages,
-            temperature: 0.4,
-          }),
-        }
+      const openrouterRes = await makeOpenRouterRequest(
+        model,
+        !!streamRequested
       );
 
-      const text = await openrouterRes.text();
-      let data = null;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        // Non-JSON from OpenRouter
-      }
-
       if (!openrouterRes.ok) {
+        const text = await openrouterRes.text();
+        let data = null;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          // Non-JSON from OpenRouter
+        }
+
         console.error(`OpenRouter error for ${model}:`, data || text);
         lastError = {
           status: openrouterRes.status,
@@ -91,7 +117,63 @@ exports.handler = async (event, context) => {
         continue;
       }
 
-      // Success
+      // STREAMING PATH
+      if (streamRequested) {
+        const headers = {
+          "Content-Type":
+            openrouterRes.headers.get("content-type") || "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        };
+
+        let streamBody = openrouterRes.body;
+
+        // If using a fallback model, prepend a small SSE chunk to notify the user.
+        if (i > 0 && streamBody) {
+          const fallbackChunk = buildFallbackChunk(fallbackNotice, model);
+          const reader = streamBody.getReader();
+
+          streamBody = new ReadableStream({
+            async start(controller) {
+              controller.enqueue(encoder.encode(fallbackChunk));
+
+              const pump = async () => {
+                try {
+                  const { done, value } = await reader.read();
+                  if (done) {
+                    controller.close();
+                    return;
+                  }
+                  controller.enqueue(value);
+                  await pump();
+                } catch (error) {
+                  controller.error(error);
+                }
+              };
+
+              await pump();
+            },
+            cancel() {
+              reader.cancel();
+            },
+          });
+        }
+
+        return new Response(streamBody, {
+          status: 200,
+          headers,
+        });
+      }
+
+      // NON-STREAMING PATH (legacy)
+      const text = await openrouterRes.text();
+      let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        // Non-JSON from OpenRouter
+      }
+
       const usingFallback = i > 0;
       if (usingFallback) {
         const existingContent = data?.choices?.[0]?.message?.content;
