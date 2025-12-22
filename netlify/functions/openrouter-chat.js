@@ -43,9 +43,8 @@ exports.handler = async (event, context) => {
   }
 
   const models = [
-    "amazon/nova-2-lite-v1:free",
-    "google/gemma-3-27b-it:free",
     "openai/gpt-oss-20b:free",
+    "google/gemma-3-27b-it:free",    
   ];
 
   const fallbackNotice =
