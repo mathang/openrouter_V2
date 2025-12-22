@@ -7,13 +7,20 @@
   <!-- Tailwind CSS for modern styling -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <style>
     :root {
-      font-family: 'Inter', sans-serif;
+      font-family: 'Open Sans', sans-serif;
+      --color-primary: #0052C4;
+      --color-secondary: #fce726;
+      --color-surface: #ffffff;
+      --color-muted: #f8fafc;
+      --color-border: #e2e8f0;
+      --color-text: #0f172a;
+      --color-subtle: #475569;
     }
     
     /* Custom Scrollbar */
@@ -29,10 +36,10 @@
       width: 6px;
     }
     .custom-scroll::-webkit-scrollbar-track {
-      background: rgba(30, 41, 59, 0.5);
+      background: rgba(226, 232, 240, 0.8);
     }
     .custom-scroll::-webkit-scrollbar-thumb {
-      background-color: #475569;
+      background-color: #94a3b8;
       border-radius: 20px;
     }
 
@@ -74,21 +81,21 @@
 
     /* Gradient Text */
     .text-gradient {
-      background: linear-gradient(to right, #818cf8, #c084fc);
+      background: linear-gradient(to right, #0052C4, #1a73e8);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
 
     /* Rich text styling for bot replies */
     .rich-text {
-      color: #e2e8f0;
+      color: var(--color-text);
     }
     .rich-text h2,
     .rich-text h3,
     .rich-text h4 {
       font-weight: 700;
       letter-spacing: -0.01em;
-      color: #cbd5ff;
+      color: var(--color-primary);
       margin-bottom: 0.35rem;
       display: inline-flex;
       align-items: center;
@@ -101,8 +108,8 @@
       width: 8px;
       height: 8px;
       border-radius: 9999px;
-      background: linear-gradient(135deg, #818cf8, #c084fc);
-      box-shadow: 0 0 0 6px rgba(129, 140, 248, 0.08);
+      background: linear-gradient(135deg, #0052C4, #1a73e8);
+      box-shadow: 0 0 0 6px rgba(0, 82, 196, 0.08);
     }
     .rich-text p {
       margin-bottom: 0.75rem;
@@ -124,7 +131,7 @@
       position: absolute;
       left: 0;
       top: 0;
-      color: #a5b4fc;
+      color: var(--color-primary);
       font-weight: 700;
     }
     .rich-text ol {
@@ -144,7 +151,7 @@
       position: absolute;
       left: 0;
       top: 0;
-      color: #a5b4fc;
+      color: var(--color-primary);
       font-weight: 700;
     }
     .rich-text hr {
@@ -158,11 +165,11 @@
       max-width: 100%;
       border-collapse: collapse;
       margin: 1rem 0;
-      border: 1px solid rgba(148, 163, 184, 0.25);
+      border: 1px solid rgba(148, 163, 184, 0.35);
       border-radius: 12px;
       overflow: hidden;
-      background: rgba(15, 23, 42, 0.35);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+      background: #f8fafc;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
       display: block;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
@@ -171,12 +178,12 @@
     .rich-text td {
       padding: 0.65rem 0.9rem;
       text-align: left;
-      border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.3);
     }
     .rich-text th {
-      background: linear-gradient(90deg, rgba(129, 140, 248, 0.12), rgba(192, 132, 252, 0.05));
-      color: #e0e7ff;
-      font-weight: 600;
+      background: linear-gradient(90deg, rgba(0, 82, 196, 0.12), rgba(26, 115, 232, 0.08));
+      color: #0f172a;
+      font-weight: 700;
       letter-spacing: 0.01em;
       text-transform: uppercase;
       font-size: 0.75rem;
@@ -185,61 +192,61 @@
       border-bottom: none;
     }
     .rich-text strong {
-      color: #cbd5ff;
+      color: #0f172a;
       font-weight: 700;
     }
     .rich-text .card-block {
-      background: linear-gradient(145deg, rgba(129, 140, 248, 0.08), rgba(30, 41, 59, 0.6));
-      border: 1px solid rgba(129, 140, 248, 0.35);
+      background: linear-gradient(145deg, rgba(0, 82, 196, 0.06), rgba(240, 247, 255, 0.9));
+      border: 1px solid rgba(0, 82, 196, 0.25);
       padding: 1rem;
       border-radius: 14px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      box-shadow: 0 10px 30px rgba(0, 82, 196, 0.08);
       backdrop-filter: blur(6px);
       margin-bottom: 0.9rem;
     }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-200 h-screen flex flex-col overflow-hidden selection:bg-indigo-500 selection:text-white">
+<body class="bg-white text-slate-900 h-screen flex flex-col overflow-hidden selection:bg-[#0052C4] selection:text-white">
 
   <!-- Header -->
-  <header class="flex-none bg-slate-900/80 backdrop-blur-md border-b border-slate-800 p-4 flex items-center gap-4 z-20 shadow-lg">
+  <header class="flex-none bg-white backdrop-blur-md border-b border-slate-200 p-4 flex items-center gap-4 z-20 shadow-sm">
     <div class="relative group cursor-pointer">
-      <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full blur opacity-50 group-hover:opacity-100 transition duration-500"></div>
+      <div class="absolute -inset-0.5 bg-gradient-to-r from-[#0052C4] to-[#1a73e8] rounded-full blur opacity-40 group-hover:opacity-80 transition duration-500"></div>
       <img
         src="./ross pic.png"
         alt="Ross Clark"
-        class="relative w-12 h-12 rounded-full object-cover border-2 border-slate-900"
+        class="relative w-12 h-12 rounded-full object-cover border-2 border-white"
         onerror="this.src='https://ui-avatars.com/api/?name=Ross+Clark&background=6366f1&color=fff'"
       />
-      <div class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-slate-900 rounded-full animate-pulse"></div>
+      <div class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full animate-pulse"></div>
     </div>
     
     <div class="flex-1 min-w-0">
-      <h1 class="text-lg font-semibold text-white truncate flex items-center gap-2">
+      <h1 class="text-lg font-semibold text-slate-900 truncate flex items-center gap-2">
         Dr. Ross Clark
-        <span class="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-medium border border-indigo-500/20">AI Coach</span>
+        <span class="px-2 py-0.5 rounded-full bg-[#0052C4]/10 text-[#0052C4] text-xs font-medium border border-[#0052C4]/20">AI Coach</span>
       </h1>
-      <p class="text-xs text-slate-400 truncate">SPX102 Introduction to Coaching • Always Online</p>
+      <p class="text-xs text-slate-500 truncate">SPX102 Introduction to Coaching • Always Online</p>
     </div>
     
     <!-- Info Button -->
-    <button onclick="alert('I can only answer questions based on the SPX102 Notes.')" class="p-2 text-slate-400 hover:text-white transition-colors rounded-full hover:bg-slate-800">
+    <button onclick="alert('I can only answer questions based on the SPX102 Notes.')" class="p-2 text-slate-500 hover:text-slate-900 transition-colors rounded-full hover:bg-slate-100">
       <i data-lucide="info" class="w-5 h-5"></i>
     </button>
   </header>
 
   <!-- Chat Log -->
-  <main id="chat-log" class="flex-1 overflow-y-auto custom-scroll p-4 space-y-6 scroll-smooth">
+  <main id="chat-log" class="flex-1 overflow-y-auto custom-scroll p-4 space-y-6 scroll-smooth bg-white">
 
     <!-- Focus Toggles -->
-    <section class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 shadow-sm space-y-3">
-      <p class="text-sm text-slate-200">Select none, one or both to make the chatbot focus on sports, clinical or sports-related clinical examples</p>
+    <section class="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
+      <p class="text-sm text-slate-700">Select none, one or both to make the chatbot focus on sports, clinical or sports-related clinical examples</p>
       <div class="flex flex-wrap gap-3">
-        <button id="clinical-toggle" type="button" class="focus:outline-none relative overflow-hidden rounded-xl border border-slate-700 bg-slate-800/60 transition hover:-translate-y-0.5 hover:border-indigo-500/70 active:scale-[0.99] p-2">
+        <button id="clinical-toggle" type="button" class="focus:outline-none relative overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:border-[#0052C4]/70 active:scale-[0.99] p-2 shadow-sm">
           <img src="./clinical.png" alt="Clinical focus" class="w-24 h-24 object-cover rounded-lg" />
           <span class="sr-only">Toggle clinical focus</span>
         </button>
-        <button id="sports-toggle" type="button" class="focus:outline-none relative overflow-hidden rounded-xl border border-slate-700 bg-slate-800/60 transition hover:-translate-y-0.5 hover:border-indigo-500/70 active:scale-[0.99] p-2">
+        <button id="sports-toggle" type="button" class="focus:outline-none relative overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:border-[#0052C4]/70 active:scale-[0.99] p-2 shadow-sm">
           <img src="./sports.png" alt="Sports focus" class="w-24 h-24 object-cover rounded-lg" />
           <span class="sr-only">Toggle sports focus</span>
         </button>
@@ -248,11 +255,11 @@
     
     <!-- Welcome Message -->
     <div class="flex gap-4">
-      <img src="./ross pic.png" class="w-10 h-10 rounded-full object-cover border border-slate-700 flex-none self-end mb-1" alt="Bot">
+      <img src="./ross pic.png" class="w-10 h-10 rounded-full object-cover border border-slate-200 flex-none self-end mb-1" alt="Bot">
       <div class="space-y-1 max-w-[85%]">
         <div class="text-xs text-slate-500 ml-1">Ross Clark</div>
-        <div class="msg-bot bg-slate-800 border border-slate-700 p-4 text-sm leading-relaxed shadow-sm">
-          <p>Hello! I'm your AI assistant for <span class="text-indigo-400 font-semibold">SPX102 INTRODUCTION TO COACHING</span>.</p>
+        <div class="msg-bot bg-white border border-slate-200 p-4 text-sm leading-relaxed shadow-sm text-slate-800">
+          <p>Hello! I'm your AI assistant for <span class="text-[#0052C4] font-semibold">SPX102 INTRODUCTION TO COACHING</span>.</p>
           <br>
           <p>I can help you understand coaching pedagogy, training principles, or LTAD based on our course notes. What's on your mind?</p>
         </div>
@@ -264,8 +271,8 @@
   <!-- Typing Indicator (Hidden by default) -->
   <div id="typing-indicator" class="hidden px-4 pb-2">
     <div class="flex gap-4">
-      <img src="./ross pic.png" class="w-8 h-8 rounded-full object-cover border border-slate-700 flex-none self-end opacity-70" alt="Bot">
-      <div class="msg-bot bg-slate-800/50 border border-slate-700/50 p-3 rounded-2xl rounded-bl-none w-16 flex items-center justify-center h-10">
+      <img src="./ross pic.png" class="w-8 h-8 rounded-full object-cover border border-slate-200 flex-none self-end opacity-70" alt="Bot">
+      <div class="msg-bot bg-slate-100 border border-slate-200 p-3 rounded-2xl rounded-bl-none w-16 flex items-center justify-center h-10">
         <div class="typing-dot"></div>
         <div class="typing-dot"></div>
         <div class="typing-dot"></div>
@@ -274,14 +281,14 @@
   </div>
 
   <!-- Input Area -->
-  <footer class="flex-none p-4 bg-slate-900/90 backdrop-blur-lg border-t border-slate-800">
+  <footer class="flex-none p-4 bg-white backdrop-blur-lg border-t border-slate-200">
     <form id="chat-form" class="max-w-4xl mx-auto relative flex items-end gap-2">
       
-      <div class="relative flex-1 bg-slate-800/50 border border-slate-700 rounded-2xl focus-within:ring-2 focus-within:ring-indigo-500/50 focus-within:border-indigo-500 focus-within:bg-slate-800 transition-all duration-300">
+      <div class="relative flex-1 bg-slate-50 border border-slate-200 rounded-2xl focus-within:ring-2 focus-within:ring-[#0052C4]/40 focus-within:border-[#0052C4] focus-within:bg-white transition-all duration-300 shadow-sm">
         <textarea
           id="user-input"
           rows="1"
-          class="w-full bg-transparent text-white placeholder-slate-500 px-4 py-3.5 outline-none resize-none overflow-hidden max-h-32 text-sm"
+          class="w-full bg-transparent text-slate-900 placeholder-slate-400 px-4 py-3.5 outline-none resize-none overflow-hidden max-h-32 text-sm"
           placeholder="Ask a question about coaching..."
           oninput="this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'"></textarea>
       </div>
@@ -289,14 +296,14 @@
       <button 
         type="submit" 
         id="send-btn" 
-        class="flex-none h-[50px] w-[50px] bg-indigo-600 hover:bg-indigo-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">
+        class="flex-none h-[50px] w-[50px] bg-[#0052C4] hover:bg-[#1a73e8] text-white rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">
         <i data-lucide="send" class="w-5 h-5 ml-0.5"></i>
       </button>
 
     </form>
     <div class="text-center mt-2">
        <span id="error" class="text-xs text-red-400 font-medium"></span>
-       <span class="text-[10px] text-slate-600">I can only answer questions based on the SPX102 INTRODUCTION TO COACHING notes I was given.</span>
+       <span class="text-[10px] text-slate-500">I can only answer questions based on the SPX102 INTRODUCTION TO COACHING notes I was given.</span>
     </div>
   </footer>
 
@@ -684,12 +691,12 @@ ${knowledgeBase}
       const highlightClasses = [
         "ring-4",
         "ring-offset-2",
-        "ring-offset-slate-900",
-        "ring-yellow-400",
-        "border-yellow-400",
-        "bg-yellow-500/10",
+        "ring-offset-white",
+        "ring-[var(--color-secondary)]",
+        "border-[var(--color-secondary)]",
+        "bg-[var(--color-secondary)]/20",
         "shadow-lg",
-        "shadow-yellow-500/40",
+        "shadow-yellow-200/80",
       ];
 
       highlightClasses.forEach((cls) => button.classList.toggle(cls, isActive));
@@ -713,7 +720,7 @@ ${knowledgeBase}
         div.className = "flex gap-4 flex-row-reverse animate-[fadeIn_0.3s_ease-out]";
         div.innerHTML = `
             <div class="space-y-1 max-w-[85%]">
-                <div class="msg-user bg-indigo-600 text-white p-4 text-sm leading-relaxed shadow-lg">
+                <div class="msg-user bg-[var(--color-primary)] text-white p-4 text-sm leading-relaxed shadow-lg">
                     ${formatMessage(content)}
                 </div>
             </div>
@@ -722,24 +729,32 @@ ${knowledgeBase}
         chatLog.scrollTop = chatLog.scrollHeight;
     }
 
+    function scrollMessageToTop(element) {
+        const containerRect = chatLog.getBoundingClientRect();
+        const elementRect = element.getBoundingClientRect();
+        const offset = elementRect.top - containerRect.top + chatLog.scrollTop;
+        chatLog.scrollTo({ top: offset, behavior: "smooth" });
+    }
+
     function addBotMessage(content) {
         const div = document.createElement("div");
         div.className = "flex gap-4 animate-[slideIn_0.3s_ease-out]";
         div.innerHTML = `
              <img src="./ross pic.png"
-                  class="w-10 h-10 rounded-full object-cover border border-slate-700 flex-none self-end mb-1"
+                  class="w-10 h-10 rounded-full object-cover border border-slate-200 flex-none self-end mb-1"
                   alt="Ross Clark"
                   onerror="this.src='https://ui-avatars.com/api/?name=Ross+Clark&background=6366f1&color=fff'">
             <div class="space-y-1 max-w-[85%]">
                 <div class="text-xs text-slate-500 ml-1">Ross Clark</div>
-                <div class="msg-bot bg-slate-800 border border-slate-700 p-4 text-sm leading-relaxed shadow-sm text-slate-200" data-role="bot-content">
+                <div class="msg-bot bg-white border border-slate-200 p-4 text-sm leading-relaxed shadow-sm text-slate-800" data-role="bot-content">
                     ${formatMessage(content)}
                 </div>
             </div>
         `;
         chatLog.appendChild(div);
-        chatLog.scrollTop = chatLog.scrollHeight;
-        return div.querySelector("[data-role='bot-content']");
+        const contentEl = div.querySelector("[data-role='bot-content']");
+        scrollMessageToTop(contentEl);
+        return contentEl;
     }
 
     function setTyping(isTyping) {
@@ -878,7 +893,6 @@ ${knowledgeBase}
             if (delta) {
               assistantContent += delta;
               botContentEl.innerHTML = formatMessage(assistantContent);
-              chatLog.scrollTop = chatLog.scrollHeight;
             }
 
             const finishReason = parsed?.choices?.[0]?.finish_reason;
