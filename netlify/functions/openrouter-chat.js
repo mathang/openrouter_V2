@@ -42,7 +42,6 @@ exports.handler = async (event, context) => {
     };
   }
 
-  const encoder = new TextEncoder();
   const buildFallbackChunk = (content, model) =>
     `data: ${JSON.stringify({
       id: "fallback-notice",
@@ -117,56 +116,28 @@ exports.handler = async (event, context) => {
         continue;
       }
 
-      // STREAMING PATH
+      const rawText = await openrouterRes.text();
+
+      // STREAMING PATH (passthrough SSE payload)
       if (streamRequested) {
         const headers = {
-          "Content-Type":
-            openrouterRes.headers.get("content-type") || "text/event-stream",
+          "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
           Connection: "keep-alive",
         };
 
-        let streamBody = openrouterRes.body;
+        const bodyText =
+          i > 0 ? `${buildFallbackChunk(fallbackNotice, model)}${rawText}` : rawText;
 
-        // If using a fallback model, prepend a small SSE chunk to notify the user.
-        if (i > 0 && streamBody) {
-          const fallbackChunk = buildFallbackChunk(fallbackNotice, model);
-          const reader = streamBody.getReader();
-
-          streamBody = new ReadableStream({
-            async start(controller) {
-              controller.enqueue(encoder.encode(fallbackChunk));
-
-              const pump = async () => {
-                try {
-                  const { done, value } = await reader.read();
-                  if (done) {
-                    controller.close();
-                    return;
-                  }
-                  controller.enqueue(value);
-                  await pump();
-                } catch (error) {
-                  controller.error(error);
-                }
-              };
-
-              await pump();
-            },
-            cancel() {
-              reader.cancel();
-            },
-          });
-        }
-
-        return new Response(streamBody, {
-          status: 200,
+        return {
+          statusCode: 200,
           headers,
-        });
+          body: bodyText,
+        };
       }
 
       // NON-STREAMING PATH (legacy)
-      const text = await openrouterRes.text();
+      const text = rawText;
       let data = null;
       try {
         data = JSON.parse(text);
