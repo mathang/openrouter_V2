@@ -1065,20 +1065,29 @@ ${knowledgeBase}
     }
 
     function handleSpeechError(event) {
-      const friendlyMessage =
-        event.error === "not-allowed" || event.error === "service-not-allowed"
-          ? "Microphone permission was blocked."
-          : `Speech recognition error: ${event.error}`;
-      errorSpan.textContent = friendlyMessage;
-      speechMode = SpeechMode.OFF;
-      stopListening();
-      updateMicButtonUI();
+      const permissionError = event.error === "not-allowed" || event.error === "service-not-allowed";
+      if (permissionError) {
+        errorSpan.textContent = "Microphone permission was blocked.";
+        speechMode = SpeechMode.OFF;
+        stopListening();
+        updateMicButtonUI();
+        return;
+      }
+
+      // For transient issues like "no-speech" or "aborted", try to recover if the mode expects listening.
+      console.warn("Speech recognition error:", event.error);
+      if (!pausedForResponse && !awaitingResponse && speechMode !== SpeechMode.OFF) {
+        setTimeout(() => startListening(), 200);
+      }
     }
 
     function handleRecognitionEnd() {
       isListening = false;
       updateMicButtonUI();
-      // Continuous mode will be resumed explicitly after the model response.
+      // If recognition stops due to platform timeouts (e.g., Android idle), restart when allowed.
+      if (!pausedForResponse && !awaitingResponse && speechMode !== SpeechMode.OFF) {
+        setTimeout(() => startListening(), 150);
+      }
     }
 
     function initSpeechRecognition() {
