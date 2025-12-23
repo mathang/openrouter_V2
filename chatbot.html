@@ -293,6 +293,17 @@
           oninput="this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'"></textarea>
       </div>
 
+      <div class="flex flex-col items-center gap-1">
+        <button
+          type="button"
+          id="mic-btn"
+          class="flex-none h-[50px] w-[50px] border border-slate-200 bg-white text-slate-700 hover:text-[#0052C4] rounded-full flex items-center justify-center shadow-sm transition-all hover:scale-105 active:scale-95"
+          aria-label="Toggle microphone mode">
+          <i data-lucide="mic-off" class="w-5 h-5"></i>
+        </button>
+        <span id="mic-mode-label" class="text-[10px] text-slate-500 text-center leading-tight">Speech off</span>
+      </div>
+
       <button 
         type="submit" 
         id="send-btn" 
@@ -320,11 +331,27 @@
     const typingIndicator = document.getElementById("typing-indicator");
     const clinicalToggle = document.getElementById("clinical-toggle");
     const sportsToggle = document.getElementById("sports-toggle");
+    const micBtn = document.getElementById("mic-btn");
+    const micModeLabel = document.getElementById("mic-mode-label");
 
     // Full message history
     let messages = [];
     let focusState = { clinical: false, sports: false };
     let pendingFocusInstruction = "";
+
+    // --- SPEECH RECOGNITION ---
+    const SpeechMode = { OFF: 0, PUSH_TO_TALK: 1, CONTINUOUS: 2 };
+    const speechModeLabels = ["Speech off", "Push-to-talk", "Continuous (auto-pause)"];
+    const RecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognitionSupported = Boolean(RecognitionClass);
+    let recognition;
+    let isListening = false;
+    let speechMode = SpeechMode.OFF;
+    let speechBuffer = "";
+    let silenceTimer = null;
+    let pausedForResponse = false;
+    let awaitingResponse = false;
+    let lastFinalTranscript = "";
 
     // --- KNOWLEDGE BASE (Restored) ---
     const knowledgeBase = `
@@ -985,38 +1012,221 @@ ${knowledgeBase}
       return assistantContent;
     }
 
-    // Form Submission
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      errorSpan.textContent = "";
+    // --- SPEECH HELPERS ---
+    function startSilenceTimer() {
+      clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(() => finalizeSpeechInput(), 2000);
+    }
 
-      const userText = textarea.value.trim();
-      if (!userText) return;
+    function finalizeSpeechInput() {
+      clearTimeout(silenceTimer);
+      silenceTimer = null;
+      if (!speechBuffer.trim()) return;
+      const spokenText = speechBuffer.trim();
+      speechBuffer = "";
+      // Prevent auto-restart when continuous mode hits the silence boundary
+      if (speechMode === SpeechMode.CONTINUOUS) {
+        pausedForResponse = true;
+        stopListening();
+      }
+      handleUserMessage(spokenText, { triggeredBySpeech: true });
+    }
+
+    function handleSpeechResult(event) {
+      let added = false;
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (!result?.isFinal) continue;
+        const transcript = result[0].transcript.trim();
+        if (!transcript || transcript === lastFinalTranscript) continue;
+
+        const normalizedBuffer = speechBuffer.toLowerCase();
+        const normalizedTranscript = transcript.toLowerCase();
+        const alreadyCaptured =
+          normalizedBuffer && normalizedTranscript.startsWith(normalizedBuffer);
+        const addition = alreadyCaptured
+          ? transcript.slice(speechBuffer.length).trim()
+          : transcript;
+
+        if (addition) {
+          speechBuffer = speechBuffer ? `${speechBuffer} ${addition}`.trim() : addition;
+          added = true;
+        } else if (!alreadyCaptured) {
+          speechBuffer = transcript;
+          added = true;
+        }
+
+        lastFinalTranscript = transcript;
+      }
+
+      if (added) {
+        startSilenceTimer();
+      }
+    }
+
+    function handleSpeechError(event) {
+      const permissionError = event.error === "not-allowed" || event.error === "service-not-allowed";
+      if (permissionError) {
+        errorSpan.textContent = "Microphone permission was blocked.";
+        speechMode = SpeechMode.OFF;
+        stopListening();
+        updateMicButtonUI();
+        return;
+      }
+
+      // For transient issues like "no-speech" or "aborted", try to recover if the mode expects listening.
+      console.warn("Speech recognition error:", event.error);
+      if (!pausedForResponse && !awaitingResponse && speechMode !== SpeechMode.OFF) {
+        setTimeout(() => startListening(), 200);
+      }
+    }
+
+    function handleRecognitionEnd() {
+      isListening = false;
+      updateMicButtonUI();
+      // If recognition stops due to platform timeouts (e.g., Android idle), restart when allowed.
+      if (!pausedForResponse && !awaitingResponse && speechMode !== SpeechMode.OFF) {
+        setTimeout(() => startListening(), 150);
+      }
+    }
+
+    function initSpeechRecognition() {
+      if (!recognitionSupported) {
+        micBtn.disabled = true;
+        micBtn.classList.add("opacity-50", "cursor-not-allowed");
+        micModeLabel.textContent = "Speech not supported";
+        return;
+      }
+      recognition = new RecognitionClass();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+      recognition.onresult = handleSpeechResult;
+      recognition.onerror = handleSpeechError;
+      recognition.onend = handleRecognitionEnd;
+      recognition.onstart = () => {
+        isListening = true;
+        updateMicButtonUI();
+      };
+    }
+
+    function startListening() {
+      if (!recognitionSupported || !recognition || isListening || pausedForResponse) return;
+      speechBuffer = "";
+      lastFinalTranscript = "";
+      try {
+        recognition.start();
+        isListening = true;
+      } catch (err) {
+        console.error(err);
+      }
+      updateMicButtonUI();
+    }
+
+    function stopListening() {
+      clearTimeout(silenceTimer);
+      silenceTimer = null;
+      speechBuffer = "";
+      lastFinalTranscript = "";
+      if (recognitionSupported && recognition && isListening) {
+        try {
+          recognition.stop();
+        } catch (err) {
+          console.error(err);
+        }
+      }
+      isListening = false;
+      updateMicButtonUI();
+    }
+
+    function pauseRecognitionForResponse() {
+      if (!recognitionSupported) return;
+      pausedForResponse = true;
+      stopListening();
+    }
+
+    function resumeRecognitionAfterResponse() {
+      if (!recognitionSupported) return;
+      pausedForResponse = false;
+      if (speechMode === SpeechMode.CONTINUOUS) {
+        startListening();
+      }
+    }
+
+    function updateMicButtonUI() {
+      const icon = speechMode === SpeechMode.OFF ? "mic-off" : pausedForResponse ? "pause-circle" : "mic";
+      micBtn.innerHTML = `<i data-lucide="${icon}" class="w-5 h-5"></i>`;
+      lucide.createIcons();
+      micModeLabel.textContent = speechModeLabels[speechMode] || "Speech off";
+      micBtn.classList.toggle("bg-[#0052C4]", speechMode !== SpeechMode.OFF && isListening);
+      micBtn.classList.toggle("text-white", speechMode !== SpeechMode.OFF && isListening);
+      micBtn.classList.toggle("border-[#0052C4]", speechMode !== SpeechMode.OFF && isListening);
+    }
+
+    function setSpeechMode(mode) {
+      if (!recognitionSupported && mode !== SpeechMode.OFF) {
+        errorSpan.textContent = "Speech recognition is not available in this browser.";
+        speechMode = SpeechMode.OFF;
+        stopListening();
+        updateMicButtonUI();
+        return;
+      }
+      speechMode = mode;
+      speechBuffer = "";
+      pausedForResponse = false;
+      clearTimeout(silenceTimer);
+      if (speechMode === SpeechMode.OFF) {
+        stopListening();
+      } else {
+        startListening();
+      }
+      updateMicButtonUI();
+    }
+
+    function cycleSpeechMode() {
+      const nextMode = (speechMode + 1) % 3;
+      setSpeechMode(nextMode);
+    }
+
+    // Unified user message handler (text or speech)
+    async function handleUserMessage(userText, { triggeredBySpeech = false } = {}) {
+      errorSpan.textContent = "";
+      const cleanedText = userText.trim();
+      if (!cleanedText) return;
 
       const focusPrefix = pendingFocusInstruction ? `${pendingFocusInstruction}. ` : "";
-      const messageToSend = `${focusPrefix}${userText}`.trim();
+      const messageToSend = `${focusPrefix}${cleanedText}`.trim();
       pendingFocusInstruction = "";
 
-      // 1. Add user message
-      addUserMessage(userText);
+      addUserMessage(cleanedText);
       messages.push({ role: "user", content: messageToSend }); // Update history
-      textarea.value = "";
-      textarea.style.height = 'auto'; // Reset height
+
+      if (!triggeredBySpeech) {
+        textarea.value = "";
+        textarea.style.height = 'auto'; // Reset height
+      }
       
       setTyping(true);
+      awaitingResponse = true;
 
-      // 2. Local Crisis Check
-      if (looksLikeCrisis(userText)) {
+      if (speechMode === SpeechMode.CONTINUOUS) {
+        pauseRecognitionForResponse();
+      }
+
+      // Local Crisis Check
+      if (looksLikeCrisis(cleanedText)) {
         setTimeout(() => {
             const supportText = crisisResponse();
             addBotMessage(supportText);
             messages.push({ role: "assistant", content: supportText });
+            awaitingResponse = false;
             setTyping(false);
+            resumeRecognitionAfterResponse();
         }, 1000); 
         return;
       }
 
-      // 3. Backend Call with streaming
+      // Backend Call with streaming
       try {
         const assistantReply = await streamAssistantResponse();
         if (assistantReply) {
@@ -1026,8 +1236,20 @@ ${knowledgeBase}
         console.error(err);
         errorSpan.textContent = "Network error connecting to backend.";
       } finally {
+        awaitingResponse = false;
         setTyping(false);
+        if (speechMode === SpeechMode.PUSH_TO_TALK) {
+          stopListening();
+        } else if (speechMode === SpeechMode.CONTINUOUS) {
+          resumeRecognitionAfterResponse();
+        }
       }
+    }
+
+    // Form Submission
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      handleUserMessage(textarea.value);
     });
 
     // Handle Enter key
@@ -1036,6 +1258,21 @@ ${knowledgeBase}
             e.preventDefault();
             form.dispatchEvent(new Event("submit"));
         }
+    });
+
+    initSpeechRecognition();
+    updateMicButtonUI();
+
+    micBtn.addEventListener("click", () => {
+      if (speechMode === SpeechMode.PUSH_TO_TALK && !isListening && !awaitingResponse && recognitionSupported) {
+        startListening();
+        return;
+      }
+      if (speechMode === SpeechMode.CONTINUOUS && !isListening && !awaitingResponse && recognitionSupported) {
+        startListening();
+        return;
+      }
+      cycleSpeechMode();
     });
 
   </script>
