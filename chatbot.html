@@ -1024,6 +1024,11 @@ ${knowledgeBase}
       if (!speechBuffer.trim()) return;
       const spokenText = speechBuffer.trim();
       speechBuffer = "";
+      // Prevent auto-restart when continuous mode hits the silence boundary
+      if (speechMode === SpeechMode.CONTINUOUS) {
+        pausedForResponse = true;
+        stopListening();
+      }
       handleUserMessage(spokenText, { triggeredBySpeech: true });
     }
 
