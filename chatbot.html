@@ -1078,9 +1078,7 @@ ${knowledgeBase}
     function handleRecognitionEnd() {
       isListening = false;
       updateMicButtonUI();
-      if (speechMode === SpeechMode.CONTINUOUS && !pausedForResponse && !awaitingResponse) {
-        setTimeout(() => startListening(), 300);
-      }
+      // Continuous mode will be resumed explicitly after the model response.
     }
 
     function initSpeechRecognition() {
