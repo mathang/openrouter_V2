@@ -823,7 +823,7 @@ ${knowledgeBase}
       const entries = [];
       chatLog.querySelectorAll(".msg-user, .msg-bot").forEach((node) => {
         const role = node.classList.contains("msg-user") ? "You" : "Coach Ross";
-        const content = node.textContent.trim().replace(/\n{3,}/g, "\n\n");
+        const content = node.innerHTML.trim();
         if (content) {
           entries.push({ role, content });
         }
@@ -838,7 +838,7 @@ ${knowledgeBase}
           ({ role, content }) => `
           <div style="margin-bottom:16px;">
             <div style="font-weight:700; color:#0052C4; margin-bottom:4px;">${escapeHtml(role)}</div>
-            <div style="white-space:pre-wrap; line-height:1.6; color:#0f172a;">${escapeHtml(content)}</div>
+            <div style="line-height:1.7; color:#0f172a;">${content}</div>
           </div>
         `
         )
@@ -846,15 +846,27 @@ ${knowledgeBase}
 
       return `
 <!DOCTYPE html>
-<html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">
 <head>
   <meta charset="UTF-8" />
   <title>SPX102 Coaching Chat Transcript</title>
+  <style>
+    body { font-family: 'Open Sans', Arial, sans-serif; color: #0f172a; padding: 24px; }
+    h1 { color: #0052C4; margin-bottom: 4px; }
+    p { line-height: 1.7; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+    th, td { border: 1px solid #e2e8f0; padding: 8px 10px; text-align: left; }
+    th { background: linear-gradient(90deg, rgba(0, 82, 196, 0.12), rgba(26, 115, 232, 0.08)); color: #0f172a; font-weight: 700; }
+    ul { padding-left: 18px; margin: 8px 0; }
+    ol { padding-left: 20px; margin: 8px 0; }
+    hr { border: 0; border-top: 2px solid #e2e8f0; margin: 16px 0; }
+    .card-block { background: linear-gradient(145deg, rgba(0, 82, 196, 0.06), rgba(240, 247, 255, 0.9)); border: 1px solid rgba(0, 82, 196, 0.25); border-radius: 14px; padding: 12px; }
+  </style>
 </head>
-<body style="font-family: 'Open Sans', Arial, sans-serif; color: #0f172a; padding: 24px;">
-  <h1 style="color: #0052C4; margin-bottom: 4px;">SPX102 Coaching Chat Transcript</h1>
+<body>
+  <h1>SPX102 Coaching Chat Transcript</h1>
   <p style="color: #475569; margin-top: 0; margin-bottom: 16px;">Generated on ${escapeHtml(timestamp)}</p>
-  <hr style="border: 0; border-top: 2px solid #e2e8f0; margin: 16px 0;" />
+  <hr />
   ${conversationHtml || "<p>No chat messages yet.</p>"}
 </body>
 </html>
@@ -869,7 +881,7 @@ ${knowledgeBase}
       }
 
       const docHtml = buildDocContent(entries);
-      const blob = new Blob([docHtml], { type: "application/msword" });
+      const blob = new Blob(["\ufeff", docHtml], { type: "application/msword;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
