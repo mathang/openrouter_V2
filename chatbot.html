@@ -351,6 +351,7 @@
     let silenceTimer = null;
     let pausedForResponse = false;
     let awaitingResponse = false;
+    let lastFinalTranscript = "";
 
     // --- KNOWLEDGE BASE (Restored) ---
     const knowledgeBase = `
@@ -1027,18 +1028,25 @@ ${knowledgeBase}
     }
 
     function handleSpeechResult(event) {
-      let finalTranscript = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        const transcript = result[0].transcript.trim();
-        if (result.isFinal && transcript) {
-          finalTranscript += (finalTranscript ? " " : "") + transcript;
-        }
+      const result = event.results[event.resultIndex];
+      if (!result || !result.isFinal) return;
+      const transcript = result[0].transcript.trim();
+      if (!transcript || transcript === lastFinalTranscript) return;
+
+      // Deduplicate partial final phrases (e.g., "The", "The cat", "The cat is ...")
+      const alreadyCaptured = speechBuffer && transcript.toLowerCase().startsWith(speechBuffer.toLowerCase());
+      const addition = alreadyCaptured
+        ? transcript.slice(speechBuffer.length).trim()
+        : transcript;
+
+      if (addition) {
+        speechBuffer = speechBuffer ? `${speechBuffer} ${addition}`.trim() : addition;
+      } else if (!alreadyCaptured) {
+        speechBuffer = transcript;
       }
-      if (finalTranscript) {
-        speechBuffer += (speechBuffer ? " " : "") + finalTranscript;
-        startSilenceTimer();
-      }
+
+      lastFinalTranscript = transcript;
+      startSilenceTimer();
     }
 
     function handleSpeechError(event) {
@@ -1083,6 +1091,7 @@ ${knowledgeBase}
     function startListening() {
       if (!recognitionSupported || !recognition || isListening || pausedForResponse) return;
       speechBuffer = "";
+      lastFinalTranscript = "";
       try {
         recognition.start();
         isListening = true;
@@ -1096,6 +1105,7 @@ ${knowledgeBase}
       clearTimeout(silenceTimer);
       silenceTimer = null;
       speechBuffer = "";
+      lastFinalTranscript = "";
       if (recognitionSupported && recognition && isListening) {
         try {
           recognition.stop();
