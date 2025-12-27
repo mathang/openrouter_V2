@@ -1054,6 +1054,17 @@ ${knowledgeBase}
       return nodes;
     }
 
+    function getContainerText(container) {
+      if (!container) return "";
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+      let text = "";
+      let node;
+      while ((node = walker.nextNode())) {
+        text += node.nodeValue || "";
+      }
+      return text;
+    }
+
     function highlightTextRange(container, start, end) {
       if (!container) return;
       clearTtsHighlights(container);
@@ -1263,15 +1274,17 @@ ${knowledgeBase}
     }
 
     async function playTtsForText(text, button, contentEl) {
-      const language = detectLanguageTag(text);
+      const speechText = contentEl ? getContainerText(contentEl).trim() : text?.trim();
+      if (!speechText) return;
+      const language = detectLanguageTag(speechText);
       const prefersBrowser = "speechSynthesis" in window;
       stopActiveAudio();
       setTtsButtonState(button, "loading");
       try {
         if (prefersBrowser) {
-          await playBrowserSpeech(text, language, button, contentEl);
+          await playBrowserSpeech(speechText, language, button, contentEl);
         } else {
-          await playServerSpeech(text, button, contentEl);
+          await playServerSpeech(speechText, button, contentEl);
         }
       } catch (err) {
         console.error(err);
@@ -1280,10 +1293,10 @@ ${knowledgeBase}
     }
 
     async function handleTtsButtonClick(button) {
-      const text = button.dataset.ttsText?.trim();
+      const contentEl = button.closest(".space-y-1")?.querySelector("[data-role='bot-content']");
+      const text = contentEl ? getContainerText(contentEl).trim() : button.dataset.ttsText?.trim();
       if (!text || button.dataset.state === "loading") return;
       errorSpan.textContent = "";
-      const contentEl = button.closest(".space-y-1")?.querySelector("[data-role='bot-content']");
       if (!narrativeModeEnabled && contentEl) {
         await handleNarrativeModeRequest({ button, contentEl });
         return;
@@ -1501,7 +1514,7 @@ ${knowledgeBase}
           ttsButton: button,
         });
         if (assistantReply) {
-          await playTtsForText(assistantReply, button);
+          await playTtsForText(assistantReply, button, contentEl);
         } else if (originalText) {
           contentEl.innerHTML = formatMessage(originalText);
           setTtsButtonText(button, originalText);
