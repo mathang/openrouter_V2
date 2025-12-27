@@ -1032,13 +1032,24 @@ ${knowledgeBase}
         const response = await fetch(HF_TTS_API, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, voice: HF_TTS_VOICE, speed: HF_TTS_SPEED }),
+          body: JSON.stringify({
+            text,
+            voice: HF_TTS_VOICE,
+            speed: HF_TTS_SPEED,
+            use_gpu: "false",
+          }),
         });
-        if (!response.ok) {
-          const errorMessage = await response.text();
-          throw new Error(errorMessage || "TTS request failed.");
+        let payload;
+        try {
+          payload = await response.json();
+        } catch (err) {
+          payload = null;
         }
-        const payload = await response.json();
+        if (!response.ok) {
+          const errorMessage =
+            payload?.error || "TTS request failed. Check server logs for details.";
+          throw new Error(errorMessage);
+        }
         const audioUrl = payload?.audioUrl;
         if (!audioUrl) {
           throw new Error("TTS audio was not returned.");

@@ -32,7 +32,7 @@ exports.handler = async (event) => {
     };
   }
 
-  const { text, voice = "af_heart", speed = 1 } = payload || {};
+  const { text, voice = "af_heart", speed = 1, use_gpu = "false" } = payload || {};
   if (!text || typeof text !== "string") {
     return {
       statusCode: 400,
@@ -42,32 +42,55 @@ exports.handler = async (event) => {
   }
 
   try {
+    const requestBody = {
+      data: [text, voice, Number(speed), use_gpu],
+      api_name: "/generate_first",
+    };
+
     const response = await fetch(`${HF_SPACE_URL}/api/predict`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Accept: "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        data: [text, voice, Number(speed)],
-        api_name: "/predict",
-      }),
+      body: JSON.stringify(requestBody),
     });
 
+    const responseText = await response.text();
+    let parsed;
+    try {
+      parsed = responseText ? JSON.parse(responseText) : null;
+    } catch (error) {
+      parsed = null;
+    }
+
     if (!response.ok) {
-      const errorText = await response.text();
+      console.error("HF TTS request failed", {
+        status: response.status,
+        statusText: response.statusText,
+        contentType: response.headers.get("content-type"),
+        bodyPreview: responseText?.slice(0, 500),
+      });
       return {
         statusCode: response.status,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          error: errorText || "Failed to fetch audio from the TTS service.",
+          error:
+            parsed?.error ||
+            responseText ||
+            "Failed to fetch audio from the TTS service.",
         }),
       };
     }
 
-    const data = await response.json();
+    const data = parsed;
     const audioPath = Array.isArray(data?.data) ? data.data[0] : null;
     if (!audioPath || typeof audioPath !== "string") {
+      console.error("HF TTS unexpected response", {
+        contentType: response.headers.get("content-type"),
+        bodyPreview: responseText?.slice(0, 500),
+      });
       return {
         statusCode: 502,
         headers: { "Content-Type": "application/json" },
