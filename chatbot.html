@@ -398,6 +398,7 @@
     let lastUserPrompt = "";
     let narrativeModeEnabled = false;
     let narrativeModeInFlight = false;
+    const ttsSpeedOptions = [1, 1.5, 2];
     let ttsSpeed = 1;
     let availableVoices = [];
 
@@ -1212,7 +1213,7 @@ ${knowledgeBase}
 
     function updateTtsSpeedUI() {
       if (!ttsSpeedToggle) return;
-      const label = ttsSpeed === 1.5 ? "1.5x" : "1x";
+      const label = `${ttsSpeed}x`;
       const speedLabelEl = ttsSpeedToggle.querySelector("span");
       if (speedLabelEl) {
         speedLabelEl.textContent = label;
@@ -1673,7 +1674,9 @@ ${knowledgeBase}
     });
 
     ttsSpeedToggle?.addEventListener("click", () => {
-      ttsSpeed = ttsSpeed === 1 ? 1.5 : 1;
+      const currentIndex = ttsSpeedOptions.indexOf(ttsSpeed);
+      const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % ttsSpeedOptions.length;
+      ttsSpeed = ttsSpeedOptions[nextIndex];
       updateTtsSpeedUI();
     });
 
