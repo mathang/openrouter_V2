@@ -273,6 +273,10 @@
         <i data-lucide="download" class="w-4 h-4"></i>
         <span>Download Chat</span>
       </button>
+      <button id="tts-speed-toggle" class="inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold text-[#0052C4] border border-[#0052C4]/40 hover:border-[#0052C4] bg-white rounded-full shadow-sm transition-colors" type="button" aria-label="Toggle speech speed">
+        <i data-lucide="gauge" class="w-4 h-4"></i>
+        <span>1x</span>
+      </button>
       <button onclick="alert('I can only answer questions based on the SPX102 Notes.')" class="p-2 text-slate-500 hover:text-slate-900 transition-colors rounded-full hover:bg-slate-100" aria-label="Information about the chatbot">
         <i data-lucide="info" class="w-5 h-5"></i>
       </button>
@@ -371,7 +375,6 @@
     const API_URL = "/.netlify/functions/openrouter-chat"; // Original Backend URL
     const HF_TTS_API = "/.netlify/functions/hf-tts";
     const HF_TTS_VOICE = "af_heart";
-    const HF_TTS_SPEED = 1;
     const chatLog = document.getElementById("chat-log");
     const form = document.getElementById("chat-form");
     const textarea = document.getElementById("user-input");
@@ -383,6 +386,7 @@
     const micBtn = document.getElementById("mic-btn");
     const micModeLabel = document.getElementById("mic-mode-label");
     const downloadBtn = document.getElementById("download-chat");
+    const ttsSpeedToggle = document.getElementById("tts-speed-toggle");
 
     // Full message history
     let messages = [];
@@ -390,6 +394,12 @@
     let pendingFocusInstruction = "";
     let activeAudio = null;
     let activeTtsButton = null;
+    let activeUtterance = null;
+    let lastUserPrompt = "";
+    let narrativeModeEnabled = false;
+    let narrativeModeInFlight = false;
+    let ttsSpeed = 1;
+    let availableVoices = [];
 
     // --- SPEECH RECOGNITION ---
     const SpeechMode = { OFF: 0, PUSH_TO_TALK: 1, CONTINUOUS: 2 };
@@ -1015,70 +1025,164 @@ ${knowledgeBase}
         activeAudio.pause();
         activeAudio.currentTime = 0;
       }
+      if (activeUtterance && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
       if (activeTtsButton) {
         setTtsButtonState(activeTtsButton, "idle");
       }
       activeAudio = null;
       activeTtsButton = null;
+      activeUtterance = null;
     }
 
-    async function handleTtsButtonClick(button) {
-      const text = button.dataset.ttsText?.trim();
-      if (!text || button.dataset.state === "loading") return;
-      errorSpan.textContent = "";
+    function detectLanguageTag(text) {
+      const sample = text.slice(0, 500);
+      if (/[\u4e00-\u9fff]/.test(sample)) return "zh";
+      if (/[\u3040-\u30ff]/.test(sample)) return "ja";
+      if (/[\uac00-\ud7af]/.test(sample)) return "ko";
+      if (/[\u0400-\u04ff]/.test(sample)) return "ru";
+      if (/[\u0600-\u06ff]/.test(sample)) return "ar";
+      if (/[\u0900-\u097f]/.test(sample)) return "hi";
+      if (/[\u0590-\u05ff]/.test(sample)) return "he";
+      if (/[\u0e00-\u0e7f]/.test(sample)) return "th";
+      if (/[¿¡ñáéíóúü]/i.test(sample)) return "es";
+      if (/[àâçéèêëîïôùûüÿœ]/i.test(sample)) return "fr";
+      return "en";
+    }
+
+    function refreshVoices() {
+      if (!("speechSynthesis" in window)) return;
+      availableVoices = window.speechSynthesis.getVoices() || [];
+    }
+
+    function selectSpeechSynthesisVoice(lang) {
+      if (!availableVoices.length) refreshVoices();
+      const normalized = lang.toLowerCase();
+      return (
+        availableVoices.find((voice) => voice.lang?.toLowerCase().startsWith(normalized)) ||
+        availableVoices.find((voice) => voice.lang?.toLowerCase().startsWith(normalized.split("-")[0])) ||
+        null
+      );
+    }
+
+    async function playBrowserSpeech(text, lang, button) {
+      if (!("speechSynthesis" in window)) {
+        throw new Error("Speech synthesis is not available.");
+      }
       stopActiveAudio();
       setTtsButtonState(button, "loading");
-      try {
-        const response = await fetch(HF_TTS_API, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text,
-            voice: HF_TTS_VOICE,
-            speed: HF_TTS_SPEED,
-            use_gpu: "false",
-          }),
-        });
-        let payload;
-        try {
-          payload = await response.json();
-        } catch (err) {
-          payload = null;
-        }
-        if (!response.ok) {
-          const errorMessage =
-            payload?.error || "TTS request failed. Check server logs for details.";
-          throw new Error(errorMessage);
-        }
-        const audioUrl = payload?.audioUrl;
-        if (!audioUrl) {
-          throw new Error("TTS audio was not returned.");
-        }
-        const audio = new Audio(audioUrl);
-        audio.playsInline = true;
-        audio.setAttribute("playsinline", "");
-        activeAudio = audio;
+      return new Promise((resolve, reject) => {
+        const utterance = new SpeechSynthesisUtterance(text);
+        const voice = selectSpeechSynthesisVoice(lang);
+        if (voice) utterance.voice = voice;
+        utterance.lang = lang;
+        utterance.rate = ttsSpeed;
+        activeUtterance = utterance;
         activeTtsButton = button;
+        utterance.onend = () => {
+          setTtsButtonState(button, "idle");
+          if (activeTtsButton === button) activeTtsButton = null;
+          activeUtterance = null;
+          resolve();
+        };
+        utterance.onerror = () => {
+          setTtsButtonState(button, "idle");
+          if (activeTtsButton === button) activeTtsButton = null;
+          activeUtterance = null;
+          reject(new Error("Unable to play the generated audio."));
+        };
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+      });
+    }
+
+    async function playServerSpeech(text, button) {
+      const response = await fetch(HF_TTS_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text,
+          voice: HF_TTS_VOICE,
+          speed: ttsSpeed,
+          use_gpu: "false",
+        }),
+      });
+      let payload;
+      try {
+        payload = await response.json();
+      } catch (err) {
+        payload = null;
+      }
+      if (!response.ok) {
+        const errorMessage =
+          payload?.error || "TTS request failed. Check server logs for details.";
+        throw new Error(errorMessage);
+      }
+      const audioUrl = payload?.audioUrl;
+      if (!audioUrl) {
+        throw new Error("TTS audio was not returned.");
+      }
+      const audio = new Audio(audioUrl);
+      audio.playsInline = true;
+      audio.setAttribute("playsinline", "");
+      activeAudio = audio;
+      activeTtsButton = button;
+      return new Promise((resolve, reject) => {
         audio.addEventListener("ended", () => {
           if (activeTtsButton === button) {
             activeTtsButton = null;
           }
           setTtsButtonState(button, "idle");
+          resolve();
         });
         audio.addEventListener("error", () => {
           if (activeTtsButton === button) {
             activeTtsButton = null;
           }
           setTtsButtonState(button, "idle");
-          errorSpan.textContent = "Unable to play the generated audio.";
+          reject(new Error("Unable to play the generated audio."));
         });
-        await audio.play();
-        setTtsButtonState(button, "idle");
+        audio.play().catch(reject);
+      });
+    }
+
+    async function playTtsForText(text, button) {
+      const language = detectLanguageTag(text);
+      const prefersBrowser = language !== "en" && "speechSynthesis" in window;
+      stopActiveAudio();
+      setTtsButtonState(button, "loading");
+      try {
+        if (prefersBrowser) {
+          await playBrowserSpeech(text, language, button);
+        } else {
+          await playServerSpeech(text, button);
+        }
       } catch (err) {
         console.error(err);
+        if (!prefersBrowser && "speechSynthesis" in window) {
+          try {
+            await playBrowserSpeech(text, language, button);
+            return;
+          } catch (fallbackError) {
+            console.error(fallbackError);
+          }
+        }
         setTtsButtonState(button, "idle");
         errorSpan.textContent = "Could not generate speech from the response.";
       }
+    }
+
+    async function handleTtsButtonClick(button) {
+      const text = button.dataset.ttsText?.trim();
+      if (!text || button.dataset.state === "loading") return;
+      errorSpan.textContent = "";
+      const contentEl = button.closest(".space-y-1")?.querySelector("[data-role='bot-content']");
+      if (!narrativeModeEnabled && contentEl) {
+        await handleNarrativeModeRequest({ button, contentEl });
+        return;
+      }
+      await playTtsForText(text, button);
     }
 
     function setTyping(isTyping) {
@@ -1104,6 +1208,16 @@ ${knowledgeBase}
           content: buildSystemPrompt(),
         },
       ];
+    }
+
+    function updateTtsSpeedUI() {
+      if (!ttsSpeedToggle) return;
+      const label = ttsSpeed === 1.5 ? "1.5x" : "1x";
+      const speedLabelEl = ttsSpeedToggle.querySelector("span");
+      if (speedLabelEl) {
+        speedLabelEl.textContent = label;
+      }
+      ttsSpeedToggle.setAttribute("aria-label", `Toggle speech speed (currently ${label})`);
     }
     
     // Initialise on load
@@ -1143,8 +1257,7 @@ ${knowledgeBase}
       <br><br>You do not have to go through this alone.`;
     }
 
-    async function streamAssistantResponse() {
-      const { contentEl: botContentEl, ttsButton } = addBotMessage("");
+    async function streamAssistantResponseInto({ messagesToSend, contentEl, ttsButton }) {
       const decoder = new TextDecoder();
       let assistantContent = "";
       let buffer = "";
@@ -1153,7 +1266,7 @@ ${knowledgeBase}
       const response = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages, stream: true }),
+        body: JSON.stringify({ messages: messagesToSend, stream: true }),
       });
 
       if (!response.ok) {
@@ -1172,7 +1285,7 @@ ${knowledgeBase}
         }
         errorSpan.textContent = "Error: " + backendMsg;
         const fallbackText = "Sorry, I couldn't generate a response just now.";
-        botContentEl.innerHTML = formatMessage(fallbackText);
+        contentEl.innerHTML = formatMessage(fallbackText);
         setTtsButtonText(ttsButton, fallbackText);
         return assistantContent;
       }
@@ -1218,7 +1331,7 @@ ${knowledgeBase}
             const delta = parsed?.choices?.[0]?.delta?.content || "";
             if (delta) {
               assistantContent += delta;
-              botContentEl.innerHTML = formatMessage(assistantContent);
+              contentEl.innerHTML = formatMessage(assistantContent);
             }
 
             const finishReason = parsed?.choices?.[0]?.finish_reason;
@@ -1236,6 +1349,65 @@ ${knowledgeBase}
         setTtsButtonText(ttsButton, assistantContent);
       }
       return assistantContent;
+    }
+
+    async function streamAssistantResponse() {
+      const { contentEl: botContentEl, ttsButton } = addBotMessage("");
+      ttsButton.dataset.userPrompt = lastUserPrompt;
+      return streamAssistantResponseInto({
+        messagesToSend: messages,
+        contentEl: botContentEl,
+        ttsButton,
+      });
+    }
+
+    async function handleNarrativeModeRequest({ button, contentEl }) {
+      if (narrativeModeInFlight) return;
+      narrativeModeInFlight = true;
+      const narrativeInstruction =
+        "Answer all further questions in narrative style with no tables or bullet points.";
+      const placeholderText =
+        "I'm just converting this response to a better format for speech - I'll be ready soon and all further responses will be done like this straight away!";
+      const originalText = button.dataset.ttsText?.trim() || "";
+      const priorPrompt = button.dataset.userPrompt?.trim() || lastUserPrompt.trim();
+      narrativeModeEnabled = true;
+      messages.push({ role: "system", content: narrativeInstruction });
+
+      contentEl.innerHTML = formatMessage(placeholderText);
+      setTtsButtonText(button, "");
+      setTtsButtonState(button, "loading");
+
+      const narrativeRequest = priorPrompt
+        ? `${narrativeInstruction}\n\nPrior prompt:\n${priorPrompt}`
+        : `${narrativeInstruction}\n\nPrior response:\n${originalText}`;
+      const narrativeMessages = [
+        { role: "system", content: buildSystemPrompt() },
+        { role: "system", content: narrativeInstruction },
+        { role: "user", content: narrativeRequest },
+      ];
+
+      try {
+        const assistantReply = await streamAssistantResponseInto({
+          messagesToSend: narrativeMessages,
+          contentEl,
+          ttsButton: button,
+        });
+        if (assistantReply) {
+          await playTtsForText(assistantReply, button);
+        } else if (originalText) {
+          contentEl.innerHTML = formatMessage(originalText);
+          setTtsButtonText(button, originalText);
+        }
+      } catch (err) {
+        console.error(err);
+        if (originalText) {
+          contentEl.innerHTML = formatMessage(originalText);
+          setTtsButtonText(button, originalText);
+        }
+        errorSpan.textContent = "Could not reformat the response for speech.";
+      } finally {
+        narrativeModeInFlight = false;
+      }
     }
 
     // --- SPEECH HELPERS ---
@@ -1410,6 +1582,7 @@ ${knowledgeBase}
       errorSpan.textContent = "";
       const cleanedText = userText.trim();
       if (!cleanedText) return;
+      lastUserPrompt = cleanedText;
 
       const focusPrefix = pendingFocusInstruction ? `${pendingFocusInstruction}. ` : "";
       const messageToSend = `${focusPrefix}${cleanedText}`.trim();
@@ -1436,6 +1609,7 @@ ${knowledgeBase}
             const supportText = crisisResponse();
             const { ttsButton } = addBotMessage(supportText);
             setTtsButtonText(ttsButton, supportText);
+            ttsButton.dataset.userPrompt = cleanedText;
             messages.push({ role: "assistant", content: supportText });
             awaitingResponse = false;
             setTyping(false);
@@ -1480,6 +1654,11 @@ ${knowledgeBase}
 
     initSpeechRecognition();
     updateMicButtonUI();
+    refreshVoices();
+    updateTtsSpeedUI();
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.onvoiceschanged = refreshVoices;
+    }
 
     micBtn.addEventListener("click", () => {
       if (speechMode === SpeechMode.PUSH_TO_TALK && !isListening && !awaitingResponse && recognitionSupported) {
@@ -1491,6 +1670,11 @@ ${knowledgeBase}
         return;
       }
       cycleSpeechMode();
+    });
+
+    ttsSpeedToggle?.addEventListener("click", () => {
+      ttsSpeed = ttsSpeed === 1 ? 1.5 : 1;
+      updateTtsSpeedUI();
     });
 
     downloadBtn?.addEventListener("click", downloadChat);
