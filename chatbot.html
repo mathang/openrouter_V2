@@ -205,6 +205,39 @@
       margin-bottom: 0.9rem;
     }
 
+    .tts-button {
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      color: #475569;
+      background: #f8fafc;
+      transition: all 0.2s ease;
+    }
+    .tts-button:hover {
+      color: #0052C4;
+      border-color: rgba(0, 82, 196, 0.6);
+      background: #eff6ff;
+    }
+    .tts-button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .tts-button[data-state="loading"] {
+      color: #0052C4;
+      border-color: rgba(0, 82, 196, 0.4);
+      background: rgba(219, 234, 254, 0.6);
+      animation: ttsPulse 1.1s ease-in-out infinite;
+    }
+    .tts-button[data-state="loading"] svg {
+      animation: ttsSpin 1s linear infinite;
+    }
+    @keyframes ttsPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+    @keyframes ttsSpin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
     .bottom-safety-pad {
       height: 5vh;
       min-height: 32px;
@@ -336,6 +369,9 @@
     lucide.createIcons();
 
     const API_URL = "/.netlify/functions/openrouter-chat"; // Original Backend URL
+    const HF_TTS_API = "/.netlify/functions/hf-tts";
+    const HF_TTS_VOICE = "af_heart";
+    const HF_TTS_SPEED = 1;
     const chatLog = document.getElementById("chat-log");
     const form = document.getElementById("chat-form");
     const textarea = document.getElementById("user-input");
@@ -352,6 +388,8 @@
     let messages = [];
     let focusState = { clinical: false, sports: false };
     let pendingFocusInstruction = "";
+    let activeAudio = null;
+    let activeTtsButton = null;
 
     // --- SPEECH RECOGNITION ---
     const SpeechMode = { OFF: 0, PUSH_TO_TALK: 1, CONTINUOUS: 2 };
@@ -936,15 +974,100 @@ ${knowledgeBase}
                   onerror="this.src='https://ui-avatars.com/api/?name=Ross+Clark&background=6366f1&color=fff'">
             <div class="space-y-1 max-w-[85%]">
                 <div class="text-xs text-slate-500 ml-1">Ross Clark</div>
-                <div class="msg-bot bg-white border border-slate-200 p-4 text-sm leading-relaxed shadow-sm text-slate-800" data-role="bot-content">
-                    ${formatMessage(content)}
+                <div class="flex items-start gap-2">
+                  <div class="msg-bot bg-white border border-slate-200 p-4 text-sm leading-relaxed shadow-sm text-slate-800" data-role="bot-content">
+                      ${formatMessage(content)}
+                  </div>
+                  <button
+                    type="button"
+                    class="tts-button h-9 w-9 rounded-full flex items-center justify-center shadow-sm"
+                    data-role="tts-button"
+                    data-state="idle"
+                    aria-label="Play message audio"
+                    title="Play audio"
+                    disabled>
+                    <i data-lucide="volume-2" class="w-4 h-4"></i>
+                  </button>
                 </div>
             </div>
         `;
         chatLog.appendChild(div);
         const contentEl = div.querySelector("[data-role='bot-content']");
+        const ttsButton = div.querySelector("[data-role='tts-button']");
+        ttsButton.addEventListener("click", () => handleTtsButtonClick(ttsButton));
+        lucide.createIcons();
         scrollMessageToTop(contentEl);
-        return contentEl;
+        return { contentEl, ttsButton };
+    }
+
+    function setTtsButtonState(button, state) {
+      button.dataset.state = state;
+      button.disabled = state === "loading";
+    }
+
+    function setTtsButtonText(button, text) {
+      button.dataset.ttsText = text;
+      button.disabled = !text;
+    }
+
+    function stopActiveAudio() {
+      if (activeAudio) {
+        activeAudio.pause();
+        activeAudio.currentTime = 0;
+      }
+      if (activeTtsButton) {
+        setTtsButtonState(activeTtsButton, "idle");
+      }
+      activeAudio = null;
+      activeTtsButton = null;
+    }
+
+    async function handleTtsButtonClick(button) {
+      const text = button.dataset.ttsText?.trim();
+      if (!text || button.dataset.state === "loading") return;
+      errorSpan.textContent = "";
+      stopActiveAudio();
+      setTtsButtonState(button, "loading");
+      try {
+        const response = await fetch(HF_TTS_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, voice: HF_TTS_VOICE, speed: HF_TTS_SPEED }),
+        });
+        if (!response.ok) {
+          const errorMessage = await response.text();
+          throw new Error(errorMessage || "TTS request failed.");
+        }
+        const payload = await response.json();
+        const audioUrl = payload?.audioUrl;
+        if (!audioUrl) {
+          throw new Error("TTS audio was not returned.");
+        }
+        const audio = new Audio(audioUrl);
+        audio.playsInline = true;
+        audio.setAttribute("playsinline", "");
+        activeAudio = audio;
+        activeTtsButton = button;
+        audio.addEventListener("ended", () => {
+          if (activeTtsButton === button) {
+            activeTtsButton = null;
+          }
+          setTtsButtonState(button, "idle");
+        });
+        audio.addEventListener("error", () => {
+          if (activeTtsButton === button) {
+            activeTtsButton = null;
+          }
+          setTtsButtonState(button, "idle");
+          errorSpan.textContent = "Unable to play the generated audio.";
+        });
+        await audio.play();
+        setTtsButtonState(button, "idle");
+      } catch (err) {
+        console.error(err);
+        setTtsButtonState(button, "idle");
+        errorSpan.textContent = "Could not generate speech from the response.";
+      }
     }
 
     function setTyping(isTyping) {
@@ -1010,7 +1133,7 @@ ${knowledgeBase}
     }
 
     async function streamAssistantResponse() {
-      const botContentEl = addBotMessage("");
+      const { contentEl: botContentEl, ttsButton } = addBotMessage("");
       const decoder = new TextDecoder();
       let assistantContent = "";
       let buffer = "";
@@ -1037,7 +1160,9 @@ ${knowledgeBase}
           // ignore
         }
         errorSpan.textContent = "Error: " + backendMsg;
-        botContentEl.innerHTML = formatMessage("Sorry, I couldn't generate a response just now.");
+        const fallbackText = "Sorry, I couldn't generate a response just now.";
+        botContentEl.innerHTML = formatMessage(fallbackText);
+        setTtsButtonText(ttsButton, fallbackText);
         return assistantContent;
       }
 
@@ -1096,6 +1221,9 @@ ${knowledgeBase}
         }
       }
 
+      if (assistantContent) {
+        setTtsButtonText(ttsButton, assistantContent);
+      }
       return assistantContent;
     }
 
@@ -1295,7 +1423,8 @@ ${knowledgeBase}
       if (looksLikeCrisis(cleanedText)) {
         setTimeout(() => {
             const supportText = crisisResponse();
-            addBotMessage(supportText);
+            const { ttsButton } = addBotMessage(supportText);
+            setTtsButtonText(ttsButton, supportText);
             messages.push({ role: "assistant", content: supportText });
             awaitingResponse = false;
             setTyping(false);
