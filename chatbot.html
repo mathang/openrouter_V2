@@ -1367,6 +1367,8 @@ ${knowledgeBase}
       narrativeModeInFlight = true;
       const narrativeInstruction =
         "Answer all further questions in narrative style with no tables or bullet points.";
+      const narrativeUserInstruction =
+        "You must respond in narrative format with no tables or bullet points.";
       const placeholderText =
         "I'm just converting this response to a better format for speech - I'll be ready soon and all further responses will be done like this straight away!";
       const originalText = button.dataset.ttsText?.trim() || "";
@@ -1384,7 +1386,7 @@ ${knowledgeBase}
       const narrativeMessages = [
         { role: "system", content: buildSystemPrompt() },
         { role: "system", content: narrativeInstruction },
-        { role: "user", content: narrativeRequest },
+        { role: "user", content: `${narrativeUserInstruction}\n\n${narrativeRequest}` },
       ];
 
       try {
@@ -1584,9 +1586,12 @@ ${knowledgeBase}
       const cleanedText = userText.trim();
       if (!cleanedText) return;
       lastUserPrompt = cleanedText;
+      const narrativeUserInstruction =
+        "You must respond in narrative format with no tables or bullet points.";
 
       const focusPrefix = pendingFocusInstruction ? `${pendingFocusInstruction}. ` : "";
-      const messageToSend = `${focusPrefix}${cleanedText}`.trim();
+      const narrativePrefix = narrativeModeEnabled ? `${narrativeUserInstruction} ` : "";
+      const messageToSend = `${focusPrefix}${narrativePrefix}${cleanedText}`.trim();
       pendingFocusInstruction = "";
 
       addUserMessage(cleanedText);
