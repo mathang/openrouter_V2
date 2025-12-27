@@ -229,6 +229,12 @@
     .tts-button[data-state="loading"] svg {
       animation: ttsSpin 1s linear infinite;
     }
+    .tts-highlight {
+      background-color: var(--color-secondary);
+      border-radius: 6px;
+      box-decoration-break: clone;
+      -webkit-box-decoration-break: clone;
+    }
     @keyframes ttsPulse {
       0%, 100% { transform: scale(1); }
       50% { transform: scale(1.08); }
@@ -411,6 +417,7 @@
     let isListening = false;
     let speechMode = SpeechMode.OFF;
     let speechBuffer = "";
+    let activeTtsContentEl = null;
     let silenceTimer = null;
     let pausedForResponse = false;
     let awaitingResponse = false;
@@ -1021,6 +1028,77 @@ ${knowledgeBase}
       button.disabled = !text;
     }
 
+    function clearTtsHighlights(container) {
+      if (!container) return;
+      const highlights = container.querySelectorAll(".tts-highlight");
+      highlights.forEach((highlight) => {
+        const textNode = document.createTextNode(highlight.textContent || "");
+        highlight.replaceWith(textNode);
+      });
+      container.normalize();
+    }
+
+    function getTextNodesWithOffsets(container) {
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+      const nodes = [];
+      let index = 0;
+      let node;
+      while ((node = walker.nextNode())) {
+        const value = node.nodeValue || "";
+        const length = value.length;
+        if (length) {
+          nodes.push({ node, start: index, end: index + length });
+          index += length;
+        }
+      }
+      return nodes;
+    }
+
+    function highlightTextRange(container, start, end) {
+      if (!container) return;
+      clearTtsHighlights(container);
+      if (start >= end) return;
+      const nodes = getTextNodesWithOffsets(container);
+      nodes.forEach(({ node, start: nodeStart, end: nodeEnd }) => {
+        if (nodeEnd <= start || nodeStart >= end) return;
+        let workingNode = node;
+        const startOffset = Math.max(start - nodeStart, 0);
+        const endOffset = Math.min(end - nodeStart, workingNode.nodeValue.length);
+        if (endOffset < workingNode.nodeValue.length) {
+          workingNode.splitText(endOffset);
+        }
+        if (startOffset > 0) {
+          workingNode = workingNode.splitText(startOffset);
+        }
+        const highlightSpan = document.createElement("span");
+        highlightSpan.className = "tts-highlight";
+        highlightSpan.textContent = workingNode.nodeValue;
+        workingNode.replaceWith(highlightSpan);
+      });
+    }
+
+    function splitIntoSentences(text) {
+      const sentences = [];
+      if (!text) return sentences;
+      const regex = /[^.!?]+[.!?]+|[^.!?]+$/g;
+      let match;
+      let offset = 0;
+      while ((match = regex.exec(text)) !== null) {
+        const chunk = match[0];
+        const trimmed = chunk.trim();
+        if (!trimmed) {
+          offset += chunk.length;
+          continue;
+        }
+        const leadingWhitespace = chunk.indexOf(trimmed);
+        const start = offset + leadingWhitespace;
+        const end = start + trimmed.length;
+        sentences.push({ text: trimmed, start, end });
+        offset += chunk.length;
+      }
+      return sentences;
+    }
+
     function stopActiveAudio() {
       if (activeAudio) {
         activeAudio.pause();
@@ -1032,9 +1110,13 @@ ${knowledgeBase}
       if (activeTtsButton) {
         setTtsButtonState(activeTtsButton, "idle");
       }
+      if (activeTtsContentEl) {
+        clearTtsHighlights(activeTtsContentEl);
+      }
       activeAudio = null;
       activeTtsButton = null;
       activeUtterance = null;
+      activeTtsContentEl = null;
     }
 
     function detectLanguageTag(text) {
@@ -1067,38 +1149,63 @@ ${knowledgeBase}
       );
     }
 
-    async function playBrowserSpeech(text, lang, button) {
+    async function playBrowserSpeech(text, lang, button, contentEl) {
       if (!("speechSynthesis" in window)) {
         throw new Error("Speech synthesis is not available.");
       }
       stopActiveAudio();
       setTtsButtonState(button, "loading");
+      const sentences = splitIntoSentences(text);
+      if (!sentences.length) {
+        setTtsButtonState(button, "idle");
+        return;
+      }
+      activeTtsButton = button;
+      activeTtsContentEl = contentEl || null;
       return new Promise((resolve, reject) => {
-        const utterance = new SpeechSynthesisUtterance(text);
-        const voice = selectSpeechSynthesisVoice(lang);
-        if (voice) utterance.voice = voice;
-        utterance.lang = lang;
-        utterance.rate = ttsSpeed;
-        activeUtterance = utterance;
-        activeTtsButton = button;
-        utterance.onend = () => {
-          setTtsButtonState(button, "idle");
-          if (activeTtsButton === button) activeTtsButton = null;
-          activeUtterance = null;
-          resolve();
-        };
-        utterance.onerror = () => {
-          setTtsButtonState(button, "idle");
-          if (activeTtsButton === button) activeTtsButton = null;
-          activeUtterance = null;
-          reject(new Error("Unable to play the generated audio."));
+        let index = 0;
+        const speakNext = () => {
+          if (index >= sentences.length) {
+            setTtsButtonState(button, "idle");
+            if (activeTtsButton === button) activeTtsButton = null;
+            activeUtterance = null;
+            if (activeTtsContentEl) {
+              clearTtsHighlights(activeTtsContentEl);
+            }
+            resolve();
+            return;
+          }
+          const sentence = sentences[index];
+          const utterance = new SpeechSynthesisUtterance(sentence.text);
+          const voice = selectSpeechSynthesisVoice(lang);
+          if (voice) utterance.voice = voice;
+          utterance.lang = lang;
+          utterance.rate = ttsSpeed;
+          activeUtterance = utterance;
+          if (activeTtsContentEl) {
+            highlightTextRange(activeTtsContentEl, sentence.start, sentence.end);
+          }
+          utterance.onend = () => {
+            index += 1;
+            speakNext();
+          };
+          utterance.onerror = () => {
+            setTtsButtonState(button, "idle");
+            if (activeTtsButton === button) activeTtsButton = null;
+            activeUtterance = null;
+            if (activeTtsContentEl) {
+              clearTtsHighlights(activeTtsContentEl);
+            }
+            reject(new Error("Unable to play the generated audio."));
+          };
+          window.speechSynthesis.speak(utterance);
         };
         window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(utterance);
+        speakNext();
       });
     }
 
-    async function playServerSpeech(text, button) {
+    async function playServerSpeech(text, button, contentEl) {
       const response = await fetch(HF_TTS_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1129,12 +1236,16 @@ ${knowledgeBase}
       audio.setAttribute("playsinline", "");
       activeAudio = audio;
       activeTtsButton = button;
+      activeTtsContentEl = contentEl || null;
       return new Promise((resolve, reject) => {
         audio.addEventListener("ended", () => {
           if (activeTtsButton === button) {
             activeTtsButton = null;
           }
           setTtsButtonState(button, "idle");
+          if (activeTtsContentEl) {
+            clearTtsHighlights(activeTtsContentEl);
+          }
           resolve();
         });
         audio.addEventListener("error", () => {
@@ -1142,35 +1253,29 @@ ${knowledgeBase}
             activeTtsButton = null;
           }
           setTtsButtonState(button, "idle");
+          if (activeTtsContentEl) {
+            clearTtsHighlights(activeTtsContentEl);
+          }
           reject(new Error("Unable to play the generated audio."));
         });
         audio.play().catch(reject);
       });
     }
 
-    async function playTtsForText(text, button) {
+    async function playTtsForText(text, button, contentEl) {
       const language = detectLanguageTag(text);
-      const prefersBrowser = language !== "en" && "speechSynthesis" in window;
+      const prefersBrowser = "speechSynthesis" in window;
       stopActiveAudio();
       setTtsButtonState(button, "loading");
       try {
         if (prefersBrowser) {
-          await playBrowserSpeech(text, language, button);
+          await playBrowserSpeech(text, language, button, contentEl);
         } else {
-          await playServerSpeech(text, button);
+          await playServerSpeech(text, button, contentEl);
         }
       } catch (err) {
         console.error(err);
-        if (!prefersBrowser && "speechSynthesis" in window) {
-          try {
-            await playBrowserSpeech(text, language, button);
-            return;
-          } catch (fallbackError) {
-            console.error(fallbackError);
-          }
-        }
         setTtsButtonState(button, "idle");
-        errorSpan.textContent = "Could not generate speech from the response.";
       }
     }
 
@@ -1183,7 +1288,7 @@ ${knowledgeBase}
         await handleNarrativeModeRequest({ button, contentEl });
         return;
       }
-      await playTtsForText(text, button);
+      await playTtsForText(text, button, contentEl);
     }
 
     function setTyping(isTyping) {
@@ -1682,6 +1787,9 @@ ${knowledgeBase}
       const currentIndex = ttsSpeedOptions.indexOf(ttsSpeed);
       const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % ttsSpeedOptions.length;
       ttsSpeed = ttsSpeedOptions[nextIndex];
+      if (activeUtterance) {
+        activeUtterance.rate = ttsSpeed;
+      }
       updateTtsSpeedUI();
     });
 
