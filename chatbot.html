@@ -369,7 +369,7 @@
     lucide.createIcons();
 
     const API_URL = "/.netlify/functions/openrouter-chat"; // Original Backend URL
-    const HF_TTS_SPACE = "https://deaconhead-kokoro-tts.hf.space";
+    const HF_TTS_API = "/.netlify/functions/hf-tts";
     const HF_TTS_VOICE = "af_heart";
     const HF_TTS_SPEED = 1;
     const chatLog = document.getElementById("chat-log");
@@ -388,7 +388,6 @@
     let messages = [];
     let focusState = { clinical: false, sports: false };
     let pendingFocusInstruction = "";
-    let ttsClientPromise = null;
     let activeAudio = null;
     let activeTtsButton = null;
 
@@ -1011,35 +1010,6 @@ ${knowledgeBase}
       button.disabled = !text;
     }
 
-    async function getTtsClient() {
-      if (!ttsClientPromise) {
-        ttsClientPromise = import("https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js")
-          .then((module) => {
-            const Client = module.Client || module.default?.Client || module.default;
-            if (Client?.connect) {
-              return Client.connect(HF_TTS_SPACE);
-            }
-            if (typeof Client === "function") {
-              return Client(HF_TTS_SPACE);
-            }
-            throw new Error("Unable to initialize TTS client.");
-          });
-      }
-      return ttsClientPromise;
-    }
-
-    function normalizeAudioUrl(audioData) {
-      if (!audioData) return "";
-      if (typeof audioData === "string") {
-        if (audioData.startsWith("http")) return audioData;
-        return `${HF_TTS_SPACE}${audioData.startsWith("/") ? "" : "/"}${audioData}`;
-      }
-      const candidate = audioData.url || audioData.path || audioData.name;
-      if (!candidate) return "";
-      if (candidate.startsWith("http")) return candidate;
-      return `${HF_TTS_SPACE}${candidate.startsWith("/") ? "" : "/"}${candidate}`;
-    }
-
     function stopActiveAudio() {
       if (activeAudio) {
         activeAudio.pause();
@@ -1059,14 +1029,23 @@ ${knowledgeBase}
       stopActiveAudio();
       setTtsButtonState(button, "loading");
       try {
-        const client = await getTtsClient();
-        const result = await client.predict("/predict", [text, HF_TTS_VOICE, HF_TTS_SPEED]);
-        const data = result?.data ?? result;
-        const audioUrl = normalizeAudioUrl(Array.isArray(data) ? data[0] : data?.[0]);
+        const response = await fetch(HF_TTS_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, voice: HF_TTS_VOICE, speed: HF_TTS_SPEED }),
+        });
+        if (!response.ok) {
+          const errorMessage = await response.text();
+          throw new Error(errorMessage || "TTS request failed.");
+        }
+        const payload = await response.json();
+        const audioUrl = payload?.audioUrl;
         if (!audioUrl) {
           throw new Error("TTS audio was not returned.");
         }
         const audio = new Audio(audioUrl);
+        audio.playsInline = true;
+        audio.setAttribute("playsinline", "");
         activeAudio = audio;
         activeTtsButton = button;
         audio.addEventListener("ended", () => {
