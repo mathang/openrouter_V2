@@ -369,9 +369,6 @@
     lucide.createIcons();
 
     const API_URL = "/.netlify/functions/openrouter-chat"; // Original Backend URL
-    const HF_TTS_API = "/.netlify/functions/hf-tts";
-    const HF_TTS_VOICE = "af_heart";
-    const HF_TTS_SPEED = 1;
     const chatLog = document.getElementById("chat-log");
     const form = document.getElementById("chat-form");
     const textarea = document.getElementById("user-input");
@@ -388,8 +385,10 @@
     let messages = [];
     let focusState = { clinical: false, sports: false };
     let pendingFocusInstruction = "";
-    let activeAudio = null;
+    let activeSpeechUtterance = null;
     let activeTtsButton = null;
+    const speechSynthesisSupported = "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
+    let availableVoices = [];
 
     // --- SPEECH RECOGNITION ---
     const SpeechMode = { OFF: 0, PUSH_TO_TALK: 1, CONTINUOUS: 2 };
@@ -1011,73 +1010,68 @@ ${knowledgeBase}
     }
 
     function stopActiveAudio() {
-      if (activeAudio) {
-        activeAudio.pause();
-        activeAudio.currentTime = 0;
+      if (activeSpeechUtterance && speechSynthesisSupported) {
+        window.speechSynthesis.cancel();
       }
       if (activeTtsButton) {
         setTtsButtonState(activeTtsButton, "idle");
       }
-      activeAudio = null;
+      activeSpeechUtterance = null;
       activeTtsButton = null;
+    }
+
+    function refreshVoices() {
+      if (!speechSynthesisSupported) return;
+      availableVoices = window.speechSynthesis.getVoices();
+    }
+
+    function pickVoice() {
+      if (!speechSynthesisSupported || availableVoices.length === 0) return null;
+      const preferred =
+        availableVoices.find((voice) => voice.lang === "en-US") ||
+        availableVoices.find((voice) => voice.lang?.startsWith("en")) ||
+        availableVoices[0];
+      return preferred || null;
     }
 
     async function handleTtsButtonClick(button) {
       const text = button.dataset.ttsText?.trim();
       if (!text || button.dataset.state === "loading") return;
       errorSpan.textContent = "";
+      if (!speechSynthesisSupported) {
+        errorSpan.textContent = "Speech synthesis is not supported in this browser.";
+        return;
+      }
       stopActiveAudio();
       setTtsButtonState(button, "loading");
       try {
-        const response = await fetch(HF_TTS_API, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text,
-            voice: HF_TTS_VOICE,
-            speed: HF_TTS_SPEED,
-            use_gpu: "false",
-          }),
-        });
-        let payload;
-        try {
-          payload = await response.json();
-        } catch (err) {
-          payload = null;
+        refreshVoices();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "en-US";
+        const selectedVoice = pickVoice();
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
         }
-        if (!response.ok) {
-          const errorMessage =
-            payload?.error || "TTS request failed. Check server logs for details.";
-          throw new Error(errorMessage);
-        }
-        const audioUrl = payload?.audioUrl;
-        if (!audioUrl) {
-          throw new Error("TTS audio was not returned.");
-        }
-        const audio = new Audio(audioUrl);
-        audio.playsInline = true;
-        audio.setAttribute("playsinline", "");
-        activeAudio = audio;
+        activeSpeechUtterance = utterance;
         activeTtsButton = button;
-        audio.addEventListener("ended", () => {
+        utterance.addEventListener("end", () => {
           if (activeTtsButton === button) {
             activeTtsButton = null;
           }
           setTtsButtonState(button, "idle");
         });
-        audio.addEventListener("error", () => {
+        utterance.addEventListener("error", () => {
           if (activeTtsButton === button) {
             activeTtsButton = null;
           }
           setTtsButtonState(button, "idle");
-          errorSpan.textContent = "Unable to play the generated audio.";
+          errorSpan.textContent = "Unable to play the speech audio.";
         });
-        await audio.play();
-        setTtsButtonState(button, "idle");
+        window.speechSynthesis.speak(utterance);
       } catch (err) {
         console.error(err);
         setTtsButtonState(button, "idle");
-        errorSpan.textContent = "Could not generate speech from the response.";
+        errorSpan.textContent = "Could not play speech from the response.";
       }
     }
 
@@ -1108,6 +1102,10 @@ ${knowledgeBase}
     
     // Initialise on load
     initMessages();
+    if (speechSynthesisSupported) {
+      refreshVoices();
+      window.speechSynthesis.addEventListener("voiceschanged", refreshVoices);
+    }
 
     // Set initial toggle appearance
     setToggleState(clinicalToggle, focusState.clinical);
