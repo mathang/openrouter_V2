@@ -1284,17 +1284,21 @@ ${knowledgeBase}
       const speechText = contentEl ? getContainerText(contentEl).trim() : text?.trim();
       if (!speechText) return;
       const language = detectLanguageTag(speechText);
-      const prefersBrowser = "speechSynthesis" in window;
+      const hasBrowserSpeech = "speechSynthesis" in window;
       stopActiveAudio();
       setTtsButtonState(button, "loading");
       try {
-        if (prefersBrowser) {
-          await playBrowserSpeech(speechText, language, button, contentEl);
-        } else {
-          await playServerSpeech(speechText, button, contentEl);
-        }
+        await playServerSpeech(speechText, button, contentEl);
       } catch (err) {
         console.error(err);
+        if (hasBrowserSpeech) {
+          try {
+            await playBrowserSpeech(speechText, language, button, contentEl);
+            return;
+          } catch (fallbackError) {
+            console.error(fallbackError);
+          }
+        }
         setTtsButtonState(button, "idle");
       }
     }
