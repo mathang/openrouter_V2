@@ -1280,28 +1280,28 @@ ${knowledgeBase}
       });
     }
 
-    async function playTtsForText(text, button, contentEl) {
-      const speechText = contentEl ? getContainerText(contentEl).trim() : text?.trim();
-      if (!speechText) return;
-      const language = detectLanguageTag(speechText);
-      const hasBrowserSpeech = "speechSynthesis" in window;
-      stopActiveAudio();
-      setTtsButtonState(button, "loading");
-      try {
-        await playServerSpeech(speechText, button, contentEl);
-      } catch (err) {
-        console.error(err);
-        if (hasBrowserSpeech) {
-          try {
-            await playBrowserSpeech(speechText, language, button, contentEl);
-            return;
-          } catch (fallbackError) {
-            console.error(fallbackError);
-          }
-        }
-        setTtsButtonState(button, "idle");
-      }
+  async function playTtsForText(text, button, contentEl) {
+  const speechText = contentEl ? getContainerText(contentEl).trim() : text?.trim();
+  if (!speechText) return;
+
+  stopActiveAudio();
+  setTtsButtonState(button, "loading");
+
+  // Split the long text into individual sentences
+  const sentences = splitIntoSentences(speechText);
+
+  try {
+    // Play each sentence one after the other
+    for (const sentence of sentences) {
+      // Each call to playServerSpeech now only handles one small chunk
+      await playServerSpeech(sentence.text, button, contentEl, sentence);
     }
+  } catch (err) {
+    console.error("Streaming error:", err);
+  } finally {
+    setTtsButtonState(button, "idle");
+  }
+}
 
     async function handleTtsButtonClick(button) {
       const contentEl = button.closest(".space-y-1")?.querySelector("[data-role='bot-content']");
