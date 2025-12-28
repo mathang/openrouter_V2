@@ -1224,24 +1224,29 @@ ${knowledgeBase}
           text,
           voice: HF_TTS_VOICE,
           speed: ttsSpeed,
-          use_gpu: "false",
         }),
       });
-      let payload;
-      try {
-        payload = await response.json();
-      } catch (err) {
-        payload = null;
-      }
       if (!response.ok) {
-        const errorMessage =
-          payload?.error || "TTS request failed. Check server logs for details.";
+        let errorMessage = "TTS request failed. Check server logs for details.";
+        try {
+          const payload = await response.json();
+          if (payload?.error) {
+            errorMessage = payload.error;
+          }
+        } catch (err) {
+          // Ignore JSON parsing errors for non-JSON responses.
+        }
         throw new Error(errorMessage);
       }
-      const audioUrl = payload?.audioUrl;
-      if (!audioUrl) {
+
+      const audioBuffer = await response.arrayBuffer();
+      if (!audioBuffer || audioBuffer.byteLength === 0) {
         throw new Error("TTS audio was not returned.");
       }
+      const audioBlob = new Blob([audioBuffer], {
+        type: response.headers.get("content-type") || "audio/wav",
+      });
+      const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
       audio.playsInline = true;
       audio.setAttribute("playsinline", "");
@@ -1250,6 +1255,7 @@ ${knowledgeBase}
       activeTtsContentEl = contentEl || null;
       return new Promise((resolve, reject) => {
         audio.addEventListener("ended", () => {
+          URL.revokeObjectURL(audioUrl);
           if (activeTtsButton === button) {
             activeTtsButton = null;
           }
@@ -1260,6 +1266,7 @@ ${knowledgeBase}
           resolve();
         });
         audio.addEventListener("error", () => {
+          URL.revokeObjectURL(audioUrl);
           if (activeTtsButton === button) {
             activeTtsButton = null;
           }
