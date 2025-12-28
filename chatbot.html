@@ -1216,81 +1216,81 @@ ${knowledgeBase}
       });
     }
 
-    async function playServerSpeech(text, button, contentEl) {
-      const response = await fetch(HF_TTS_API, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text,
-          voice: HF_TTS_VOICE,
-          speed: ttsSpeed,
-          use_gpu: "false",
-        }),
-      });
-      let payload;
-      try {
-        payload = await response.json();
-      } catch (err) {
-        payload = null;
+   // A simple queue to hold pre-fetched audio blobs
+let audioQueue = [];
+
+async function playTtsForText(text, button, contentEl) {
+  const speechText = contentEl ? getContainerText(contentEl).trim() : text?.trim();
+  if (!speechText) return;
+
+  stopActiveAudio();
+  setTtsButtonState(button, "loading");
+  
+  const sentences = splitIntoSentences(speechText);
+  audioQueue = []; // Reset queue
+
+  try {
+    for (let i = 0; i < sentences.length; i++) {
+      const sentence = sentences[i];
+      
+      // 1. Fetch the current sentence if it's not already in the queue
+      let audioBlob;
+      if (audioQueue[i]) {
+        audioBlob = audioQueue[i];
+      } else {
+        audioBlob = await fetchAudioBlob(sentence.text);
       }
-      if (!response.ok) {
-        const errorMessage =
-          payload?.error || "TTS request failed. Check server logs for details.";
-        throw new Error(errorMessage);
-      }
-      const audioUrl = payload?.audioUrl;
-      if (!audioUrl) {
-        throw new Error("TTS audio was not returned.");
-      }
-      const audio = new Audio(audioUrl);
-      audio.playsInline = true;
-      audio.setAttribute("playsinline", "");
-      activeAudio = audio;
-      activeTtsButton = button;
-      activeTtsContentEl = contentEl || null;
-      return new Promise((resolve, reject) => {
-        audio.addEventListener("ended", () => {
-          if (activeTtsButton === button) {
-            activeTtsButton = null;
-          }
-          setTtsButtonState(button, "idle");
-          if (activeTtsContentEl) {
-            clearTtsHighlights(activeTtsContentEl);
-          }
-          resolve();
+
+      // 2. Start pre-fetching the NEXT sentence in the background (don't 'await' it)
+      if (i + 1 < sentences.length) {
+        fetchAudioBlob(sentences[i + 1].text).then(blob => {
+          audioQueue[i + 1] = blob;
         });
-        audio.addEventListener("error", () => {
-          if (activeTtsButton === button) {
-            activeTtsButton = null;
-          }
-          setTtsButtonState(button, "idle");
-          if (activeTtsContentEl) {
-            clearTtsHighlights(activeTtsContentEl);
-          }
-          reject(new Error("Unable to play the generated audio."));
-        });
-        audio.play().catch(reject);
-      });
+      }
+
+      // 3. Play the current audio and wait for it to finish
+      await playAudioFromBlob(audioBlob, button, contentEl, sentence);
+    }
+  } catch (err) {
+    console.error("TTS Queue Error:", err);
+    errorSpan.textContent = "Playback error. Switching to browser speech.";
+    // Fallback to browser TTS if needed
+  } finally {
+    setTtsButtonState(button, "idle");
+  }
+}
+
+// Helper to ONLY fetch the audio from your Netlify function
+async function fetchAudioBlob(text) {
+  const response = await fetch(HF_TTS_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, voice: HF_TTS_VOICE, speed: ttsSpeed }),
+  });
+
+  if (!response.ok) throw new Error("Fetch failed");
+  return await response.blob();
+}
+
+// Helper to ONLY play the audio and handle highlighting
+function playAudioFromBlob(blob, button, contentEl, sentenceMetadata) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    activeAudio = audio;
+
+    if (contentEl && sentenceMetadata) {
+      highlightTextRange(contentEl, sentenceMetadata.start, sentenceMetadata.end);
     }
 
-    async function playTtsForText(text, button, contentEl) {
-      const speechText = contentEl ? getContainerText(contentEl).trim() : text?.trim();
-      if (!speechText) return;
-      const language = detectLanguageTag(speechText);
-      const prefersBrowser = "speechSynthesis" in window;
-      stopActiveAudio();
-      setTtsButtonState(button, "loading");
-      try {
-        if (prefersBrowser) {
-          await playBrowserSpeech(speechText, language, button, contentEl);
-        } else {
-          await playServerSpeech(speechText, button, contentEl);
-        }
-      } catch (err) {
-        console.error(err);
-        setTtsButtonState(button, "idle");
-      }
-    }
+    audio.onended = () => {
+      URL.revokeObjectURL(url);
+      resolve();
+    };
+    audio.onerror = reject;
+    audio.play().catch(reject);
+  });
+}
 
     async function handleTtsButtonClick(button) {
       const contentEl = button.closest(".space-y-1")?.querySelector("[data-role='bot-content']");

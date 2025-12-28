@@ -1,117 +1,87 @@
-const HF_SPACE_URL = "https://deaconhead-kokoro-tts.hf.space";
+import { Client } from "@gradio/client";
 
-exports.handler = async (event) => {
+/**
+ * Netlify Function: hf-tts
+ * Handles communication with Hugging Face Kokoro-TTS Space
+ * IMPORTANT: Ensure package.json has "type": "module" and "@gradio/client" dependency.
+ */
+export const handler = async (event) => {
+  // CORS Preflight handling
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+      },
+    };
+  }
+
   if (event.httpMethod !== "POST") {
     return {
       statusCode: 405,
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ error: "Method not allowed" }),
     };
   }
 
-  const token = process.env.HUGGINGFACE_TOKEN;
-  if (!token) {
-    return {
-      statusCode: 500,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        error:
-          "HUGGINGFACE_TOKEN is not set on the server. Configure it in Netlify environment variables.",
-      }),
-    };
-  }
-
-  let payload;
   try {
-    payload = JSON.parse(event.body || "{}");
-  } catch (error) {
-    return {
-      statusCode: 400,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ error: "Invalid JSON body" }),
-    };
-  }
+    const { text, voice = "af_bella", speed = 1.0 } = JSON.parse(event.body);
 
-  const { text, voice = "af_heart", speed = 1, use_gpu = "false" } = payload || {};
-  if (!text || typeof text !== "string") {
-    return {
-      statusCode: 400,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ error: "Missing required 'text' string." }),
-    };
-  }
-
-  try {
-    const requestBody = {
-      data: [text, voice, Number(speed), use_gpu],
-      api_name: "/generate_first",
-    };
-
-    const response = await fetch(`${HF_SPACE_URL}/api/predict`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    const responseText = await response.text();
-    let parsed;
-    try {
-      parsed = responseText ? JSON.parse(responseText) : null;
-    } catch (error) {
-      parsed = null;
-    }
-
-    if (!response.ok) {
-      console.error("HF TTS request failed", {
-        status: response.status,
-        statusText: response.statusText,
-        contentType: response.headers.get("content-type"),
-        bodyPreview: responseText?.slice(0, 500),
-      });
+    if (!text) {
       return {
-        statusCode: response.status,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          error:
-            parsed?.error ||
-            responseText ||
-            "Failed to fetch audio from the TTS service.",
-        }),
+        statusCode: 400,
+        body: JSON.stringify({ error: "Text is required" }),
       };
     }
 
-    const data = parsed;
-    const audioPath = Array.isArray(data?.data) ? data.data[0] : null;
-    if (!audioPath || typeof audioPath !== "string") {
-      console.error("HF TTS unexpected response", {
-        contentType: response.headers.get("content-type"),
-        bodyPreview: responseText?.slice(0, 500),
-      });
-      return {
-        statusCode: 502,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ error: "Unexpected response from TTS service." }),
-      };
+    console.log(`Connecting to Kokoro-TTS for text: "${text.substring(0, 20)}..."`);
+
+    const hfToken = process.env.HF_TOKEN || process.env.HUGGINGFACE_TOKEN;
+    const app = hfToken
+      ? await Client.connect("https://deaconhead-kokoro-tts.hf.space", {
+          hf_token: hfToken,
+        })
+      : await Client.connect("https://deaconhead-kokoro-tts.hf.space");
+
+    const result = await app.predict("/predict", [text, voice, parseFloat(speed)]);
+
+    if (!result.data || !result.data[0]) {
+      throw new Error("No audio data returned from Hugging Face.");
     }
 
-    const audioUrl = audioPath.startsWith("http")
-      ? audioPath
-      : `${HF_SPACE_URL}${audioPath.startsWith("/") ? "" : "/"}${audioPath}`;
+    const audioUrl = result.data[0].url;
+    const audioResponse = await fetch(audioUrl);
+
+    if (!audioResponse.ok) throw new Error("Failed to fetch audio file from HF.");
+
+    const audioBuffer = await audioResponse.arrayBuffer();
 
     return {
       statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ audioUrl }),
+      headers: {
+        "Content-Type": "audio/wav",
+        "Access-Control-Allow-Origin": "*",
+      },
+      body: Buffer.from(audioBuffer).toString("base64"),
+      isBase64Encoded: true,
     };
   } catch (error) {
+    console.error("TTS Function Error:", error.message);
+
+    // Check for common Netlify/HF timeout patterns
+    const isTimeout =
+      error.message.toLowerCase().includes("timeout") ||
+      error.message.toLowerCase().includes("fetch");
+
     return {
-      statusCode: 502,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ error: error.message || "TTS request failed." }),
+      statusCode: 500,
+      body: JSON.stringify({
+        error: isTimeout
+          ? "Hugging Face Space is waking up. Please try again in 30 seconds."
+          : error.message,
+        type: "TTS_ERROR",
+      }),
     };
   }
 };
