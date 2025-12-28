@@ -50,13 +50,23 @@ export const handler = async (event) => {
       throw new Error("No audio data returned from Hugging Face.");
     }
 
-    const audioUrl = result.data[0].url;
-    const audioResponse = await fetch(audioUrl);
+   const audioUrl = result.data[0].url;
 
-    if (!audioResponse.ok) throw new Error("Failed to fetch audio file from HF.");
+    // MODIFIED: Include the Authorization header to download from a Private Space
+    const audioResponse = await fetch(audioUrl, {
+      headers: {
+        "Authorization": `Bearer ${hfToken}`
+      }
+    });
+
+    if (!audioResponse.ok) {
+      // Enhanced error logging to help you debug
+      const errorDetail = await audioResponse.text();
+      console.error("HF File Download Error:", errorDetail);
+      throw new Error(`Failed to fetch audio file from HF: ${audioResponse.status}`);
+    }
 
     const audioBuffer = await audioResponse.arrayBuffer();
-
     return {
       statusCode: 200,
       headers: {
