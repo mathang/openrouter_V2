@@ -33,7 +33,7 @@ exports.handler = async (event, context) => {
     };
   }
 
-  const { messages, stream: streamRequested } = body || {};
+  const { messages, stream: streamRequested, plugins } = body || {};
   if (!Array.isArray(messages)) {
     return {
       statusCode: 400,
@@ -71,6 +71,10 @@ exports.handler = async (event, context) => {
       messages,
       temperature: 0.4,
     };
+
+    if (Array.isArray(plugins) && plugins.length) {
+      payload.plugins = plugins;
+    }
 
     if (wantsStream) {
       payload.stream = true;
