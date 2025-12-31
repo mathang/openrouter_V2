@@ -1592,12 +1592,14 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata) {
       setTtsButtonState(button, "loading");
 
       const narrativeRequest = priorPrompt
-        ? `${narrativeInstruction}\n\nPrior prompt:\n${priorPrompt}`
-        : `${narrativeInstruction}\n\nPrior response:\n${originalText}`;
+        ? `Please rewrite your last response in narrative form. Prior prompt:\n${priorPrompt}`
+        : "Please rewrite your last response in narrative form.";
       const narrativeMessages = [
-        { role: "system", content: buildSystemPrompt() },
-        { role: "system", content: narrativeInstruction },
-        { role: "user", content: `${narrativeUserInstruction}\n\n${narrativeRequest}` },
+        ...messages,
+        {
+          role: "user",
+          content: `${narrativeUserInstruction}\n\n${narrativeRequest}`,
+        },
       ];
 
       try {
