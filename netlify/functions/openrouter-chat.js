@@ -33,7 +33,7 @@ exports.handler = async (event, context) => {
     };
   }
 
-  const { messages, stream: streamRequested } = body || {};
+  const { messages, stream: streamRequested, plugins } = body || {};
   if (!Array.isArray(messages)) {
     return {
       statusCode: 400,
@@ -57,7 +57,8 @@ exports.handler = async (event, context) => {
     })}\n\n`;
 
   const models = [
-    "google/gemini-3-flash-preview",    
+    "google/gemini-2.5-flash-lite",
+    "google/gemini-3-flash-preview",
     "google/gemma-3-27b-it:free",
     "openai/gpt-oss-20b:free",
   ];
@@ -71,6 +72,10 @@ exports.handler = async (event, context) => {
       messages,
       temperature: 0.4,
     };
+
+    if (Array.isArray(plugins) && plugins.length) {
+      payload.plugins = plugins;
+    }
 
     if (wantsStream) {
       payload.stream = true;
