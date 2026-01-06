@@ -279,10 +279,43 @@
         <i data-lucide="download" class="w-4 h-4"></i>
         <span>Download Chat</span>
       </button>
-      <button id="tts-speed-toggle" class="inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold text-[#0052C4] border border-[#0052C4]/40 hover:border-[#0052C4] bg-white rounded-full shadow-sm transition-colors" type="button" aria-label="Toggle speech speed">
-        <i data-lucide="gauge" class="w-4 h-4"></i>
-        <span>1x</span>
-      </button>
+      <div class="relative">
+        <button id="speech-options-toggle" class="inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold text-[#0052C4] border border-[#0052C4]/40 hover:border-[#0052C4] bg-white rounded-full shadow-sm transition-colors" type="button" aria-label="Speech options">
+          <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+          <span>Speech options</span>
+        </button>
+        <div id="speech-options-panel" class="hidden absolute right-0 mt-3 w-64 rounded-2xl border border-slate-200 bg-white shadow-lg p-4 space-y-4 z-30">
+          <div class="space-y-2">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Speech engine</p>
+            <select id="speech-engine" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0052C4]/40">
+              <option value="huggingface">Hugging Face (English voices)</option>
+              <option value="browser">Browser default (all languages)</option>
+            </select>
+          </div>
+          <div class="space-y-2">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Voice</p>
+            <div class="flex flex-col gap-2 text-sm text-slate-700">
+              <label class="flex items-center gap-2">
+                <input type="radio" name="speech-voice" value="female" class="accent-[#0052C4]" checked>
+                Heart (Female)
+              </label>
+              <label class="flex items-center gap-2">
+                <input type="radio" name="speech-voice" value="male" class="accent-[#0052C4]">
+                Fenrir (Male)
+              </label>
+            </div>
+          </div>
+          <div class="space-y-2">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Speed</p>
+            <select id="speech-speed" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0052C4]/40">
+              <option value="1">1x (Normal)</option>
+              <option value="1.5">1.5x (Fast)</option>
+              <option value="2">2x (Very fast)</option>
+            </select>
+          </div>
+          <p class="text-[11px] text-slate-500 leading-relaxed">Tip: Choose browser speech for multilingual playback.</p>
+        </div>
+      </div>
       <button onclick="alert('I can only answer questions based on the SPX102 Notes.')" class="p-2 text-slate-500 hover:text-slate-900 transition-colors rounded-full hover:bg-slate-100" aria-label="Information about the chatbot">
         <i data-lucide="info" class="w-5 h-5"></i>
       </button>
@@ -401,7 +434,10 @@
 
     const API_URL = "/.netlify/functions/openrouter-chat"; // Original Backend URL
     const HF_TTS_API = "/.netlify/functions/hf-tts";
-    const HF_TTS_VOICE = "af_heart";
+    const HF_TTS_VOICES = {
+      female: "af_heart",
+      male: "af_fenrir",
+    };
     const chatLog = document.getElementById("chat-log");
     const form = document.getElementById("chat-form");
     const textarea = document.getElementById("user-input");
@@ -417,7 +453,11 @@
     const pdfLabel = document.getElementById("pdf-label");
     const pdfClearBtn = document.getElementById("pdf-clear");
     const downloadBtn = document.getElementById("download-chat");
-    const ttsSpeedToggle = document.getElementById("tts-speed-toggle");
+    const speechOptionsToggle = document.getElementById("speech-options-toggle");
+    const speechOptionsPanel = document.getElementById("speech-options-panel");
+    const speechEngineSelect = document.getElementById("speech-engine");
+    const speechSpeedSelect = document.getElementById("speech-speed");
+    const speechVoiceInputs = document.querySelectorAll("input[name='speech-voice']");
 
     // Full message history
     let messages = [];
@@ -431,6 +471,9 @@
     let narrativeModeInFlight = false;
     const ttsSpeedOptions = [1, 1.5, 2];
     let ttsSpeed = 1;
+    let ttsEngine = "huggingface";
+    let ttsVoice = "female";
+    let ttsPlaybackToken = 0;
     let availableVoices = [];
     let pdfAttachment = null;
 
@@ -1056,7 +1099,13 @@ ${knowledgeBase}
 
     function setTtsButtonState(button, state) {
       button.dataset.state = state;
-      button.disabled = state === "loading";
+      if (state === "loading") {
+        button.setAttribute("aria-label", "Stop message audio");
+        button.setAttribute("title", "Stop audio");
+      } else {
+        button.setAttribute("aria-label", "Play message audio");
+        button.setAttribute("title", "Play audio");
+      }
     }
 
     function setTtsButtonText(button, text) {
@@ -1147,6 +1196,7 @@ ${knowledgeBase}
     }
 
     function stopActiveAudio() {
+      ttsPlaybackToken += 1;
       if (activeAudio) {
         activeAudio.pause();
         activeAudio.currentTime = 0;
@@ -1201,6 +1251,7 @@ ${knowledgeBase}
         throw new Error("Speech synthesis is not available.");
       }
       stopActiveAudio();
+      const playbackToken = ttsPlaybackToken;
       setTtsButtonState(button, "loading");
       const sentences = splitIntoSentences(text);
       if (!sentences.length) {
@@ -1212,6 +1263,10 @@ ${knowledgeBase}
       return new Promise((resolve, reject) => {
         let index = 0;
         const speakNext = () => {
+          if (playbackToken !== ttsPlaybackToken) {
+            resolve();
+            return;
+          }
           if (index >= sentences.length) {
             setTtsButtonState(button, "idle");
             if (activeTtsButton === button) activeTtsButton = null;
@@ -1233,6 +1288,10 @@ ${knowledgeBase}
             highlightTextRange(activeTtsContentEl, sentence.start, sentence.end);
           }
           utterance.onend = () => {
+            if (playbackToken !== ttsPlaybackToken) {
+              resolve();
+              return;
+            }
             index += 1;
             speakNext();
           };
@@ -1259,14 +1318,24 @@ async function playTtsForText(text, button, contentEl) {
   const speechText = contentEl ? getContainerText(contentEl).trim() : text?.trim();
   if (!speechText) return;
 
+  if (ttsEngine === "browser") {
+    const lang = detectLanguageTag(speechText);
+    await playBrowserSpeech(speechText, lang, button, contentEl);
+    return;
+  }
+
   stopActiveAudio();
+  const playbackToken = ttsPlaybackToken;
   setTtsButtonState(button, "loading");
+  activeTtsButton = button;
+  activeTtsContentEl = contentEl || null;
   
   const sentences = splitIntoSentences(speechText);
   audioQueue = []; // Reset queue
 
   try {
     for (let i = 0; i < sentences.length; i++) {
+      if (playbackToken !== ttsPlaybackToken) break;
       const sentence = sentences[i];
       
       // 1. Fetch the current sentence if it's not already in the queue
@@ -1277,6 +1346,8 @@ async function playTtsForText(text, button, contentEl) {
         audioBlob = await fetchAudioBlob(sentence.text);
       }
 
+      if (playbackToken !== ttsPlaybackToken) break;
+
       // 2. Start pre-fetching the NEXT sentence in the background (don't 'await' it)
       if (i + 1 < sentences.length) {
         fetchAudioBlob(sentences[i + 1].text).then(blob => {
@@ -1285,14 +1356,22 @@ async function playTtsForText(text, button, contentEl) {
       }
 
       // 3. Play the current audio and wait for it to finish
-      await playAudioFromBlob(audioBlob, button, contentEl, sentence);
+      await playAudioFromBlob(audioBlob, button, contentEl, sentence, playbackToken);
     }
   } catch (err) {
     console.error("TTS Queue Error:", err);
     errorSpan.textContent = "Playback error. Switching to browser speech.";
-    // Fallback to browser TTS if needed
+    const lang = detectLanguageTag(speechText);
+    await playBrowserSpeech(speechText, lang, button, contentEl);
   } finally {
-    setTtsButtonState(button, "idle");
+    if (playbackToken === ttsPlaybackToken) {
+      setTtsButtonState(button, "idle");
+      if (activeTtsContentEl) {
+        clearTtsHighlights(activeTtsContentEl);
+      }
+      activeTtsButton = null;
+      activeTtsContentEl = null;
+    }
   }
 }
 
@@ -1301,7 +1380,7 @@ async function fetchAudioBlob(text) {
   const response = await fetch(HF_TTS_API, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, voice: HF_TTS_VOICE, speed: ttsSpeed }),
+    body: JSON.stringify({ text, voice: HF_TTS_VOICES[ttsVoice], speed: ttsSpeed }),
   });
 
   if (!response.ok) throw new Error("Fetch failed");
@@ -1309,11 +1388,17 @@ async function fetchAudioBlob(text) {
 }
 
 // Helper to ONLY play the audio and handle highlighting
-function playAudioFromBlob(blob, button, contentEl, sentenceMetadata) {
+function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackToken) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
     activeAudio = audio;
+
+    if (playbackToken !== ttsPlaybackToken) {
+      URL.revokeObjectURL(url);
+      resolve();
+      return;
+    }
 
     if (contentEl && sentenceMetadata) {
       highlightTextRange(contentEl, sentenceMetadata.start, sentenceMetadata.end);
@@ -1323,6 +1408,12 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata) {
       URL.revokeObjectURL(url);
       resolve();
     };
+    audio.onpause = () => {
+      if (playbackToken !== ttsPlaybackToken) {
+        URL.revokeObjectURL(url);
+        resolve();
+      }
+    };
     audio.onerror = reject;
     audio.play().catch(reject);
   });
@@ -1331,7 +1422,11 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata) {
     async function handleTtsButtonClick(button) {
       const contentEl = button.closest(".space-y-1")?.querySelector("[data-role='bot-content']");
       const text = contentEl ? getContainerText(contentEl).trim() : button.dataset.ttsText?.trim();
-      if (!text || button.dataset.state === "loading") return;
+      if (button.dataset.state === "loading") {
+        stopActiveAudio();
+        return;
+      }
+      if (!text) return;
       errorSpan.textContent = "";
       if (!narrativeModeEnabled && contentEl) {
         await handleNarrativeModeRequest({ button, contentEl });
@@ -1365,14 +1460,17 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata) {
       ];
     }
 
-    function updateTtsSpeedUI() {
-      if (!ttsSpeedToggle) return;
-      const label = `${ttsSpeed}x`;
-      const speedLabelEl = ttsSpeedToggle.querySelector("span");
-      if (speedLabelEl) {
-        speedLabelEl.textContent = label;
+    function updateSpeechOptionsUI() {
+      if (speechSpeedSelect) {
+        speechSpeedSelect.value = `${ttsSpeed}`;
       }
-      ttsSpeedToggle.setAttribute("aria-label", `Toggle speech speed (currently ${label})`);
+      if (speechEngineSelect) {
+        speechEngineSelect.value = ttsEngine;
+      }
+      speechVoiceInputs.forEach((input) => {
+        input.checked = input.value === ttsVoice;
+        input.disabled = ttsEngine !== "huggingface";
+      });
     }
 
     function truncateFileName(name, maxLength = 22) {
@@ -1930,7 +2028,7 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata) {
     initSpeechRecognition();
     updateMicButtonUI();
     refreshVoices();
-    updateTtsSpeedUI();
+    updateSpeechOptionsUI();
     if ("speechSynthesis" in window) {
       window.speechSynthesis.onvoiceschanged = refreshVoices;
     }
@@ -1947,14 +2045,57 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata) {
       cycleSpeechMode();
     });
 
-    ttsSpeedToggle?.addEventListener("click", () => {
-      const currentIndex = ttsSpeedOptions.indexOf(ttsSpeed);
-      const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % ttsSpeedOptions.length;
-      ttsSpeed = ttsSpeedOptions[nextIndex];
-      if (activeUtterance) {
-        activeUtterance.rate = ttsSpeed;
+    speechOptionsToggle?.addEventListener("click", () => {
+      speechOptionsPanel?.classList.toggle("hidden");
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!speechOptionsPanel || !speechOptionsToggle) return;
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (
+        speechOptionsPanel.classList.contains("hidden") ||
+        speechOptionsPanel.contains(target) ||
+        speechOptionsToggle.contains(target)
+      ) {
+        return;
       }
-      updateTtsSpeedUI();
+      speechOptionsPanel.classList.add("hidden");
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        speechOptionsPanel?.classList.add("hidden");
+      }
+    });
+
+    speechEngineSelect?.addEventListener("change", (event) => {
+      const value = event.target.value;
+      if (value === "huggingface" || value === "browser") {
+        ttsEngine = value;
+      }
+      stopActiveAudio();
+      updateSpeechOptionsUI();
+    });
+
+    speechSpeedSelect?.addEventListener("change", (event) => {
+      const value = Number(event.target.value);
+      if (ttsSpeedOptions.includes(value)) {
+        ttsSpeed = value;
+        if (activeUtterance) {
+          activeUtterance.rate = ttsSpeed;
+        }
+      }
+      updateSpeechOptionsUI();
+    });
+
+    speechVoiceInputs.forEach((input) => {
+      input.addEventListener("change", () => {
+        if (input.checked) {
+          ttsVoice = input.value === "male" ? "male" : "female";
+        }
+        updateSpeechOptionsUI();
+      });
     });
 
     downloadBtn?.addEventListener("click", downloadChat);
