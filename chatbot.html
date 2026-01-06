@@ -1482,6 +1482,34 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
       return `${base}…${ext}`;
     }
 
+    function getSessionId() {
+      const storageKey = "chat_session_id";
+      const existing = localStorage.getItem(storageKey);
+      if (existing) return existing;
+      const generated =
+        (window.crypto?.randomUUID && window.crypto.randomUUID()) ||
+        `session_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+      localStorage.setItem(storageKey, generated);
+      return generated;
+    }
+
+    async function logToFirebase(role, content) {
+      try {
+        await fetch("/.netlify/functions/log-chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: getSessionId(),
+            role,
+            content,
+            timestamp: new Date().toISOString(),
+          }),
+        });
+      } catch (err) {
+        console.error("Failed to log to Firebase", err);
+      }
+    }
+
     function resetPdfAttachment() {
       pdfAttachment = null;
       if (pdfInput) {
@@ -1907,7 +1935,9 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
       const messageToSend = `${focusPrefix}${narrativePrefix}${fallbackPrompt}`.trim();
       pendingFocusInstruction = "";
 
-      addUserMessage(cleanedText || "PDF attached.", pdfAttachment?.name);
+      const userLogText = cleanedText || "PDF attached.";
+      addUserMessage(userLogText, pdfAttachment?.name);
+      logToFirebase("user", userLogText);
       const contentPayload = hasPdf
         ? [
             { type: "text", text: messageToSend },
@@ -1945,6 +1975,7 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
             setTtsButtonText(ttsButton, supportText);
             ttsButton.dataset.userPrompt = cleanedText;
             messages.push({ role: "assistant", content: supportText });
+            logToFirebase("assistant", supportText);
             awaitingResponse = false;
             setTyping(false);
             resumeRecognitionAfterResponse();
@@ -1957,6 +1988,7 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
         const assistantReply = await streamAssistantResponse();
         if (assistantReply) {
           messages.push({ role: "assistant", content: assistantReply });
+          logToFirebase("assistant", assistantReply);
         }
       } catch (err) {
         console.error(err);
