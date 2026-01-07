@@ -1,7 +1,7 @@
 // netlify/functions/openrouter-chat.js
-// CommonJS-style Netlify function for better compatibility
+// Netlify function (ESM)
 
-exports.handler = async (event, context) => {
+export const handler = async (event, context) => {
   if (event.httpMethod !== "POST") {
     return {
       statusCode: 405,
