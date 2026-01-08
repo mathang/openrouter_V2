@@ -55,8 +55,10 @@ export const handler = async (event) => {
     const hfToken = process.env.HF_TOKEN || process.env.HUGGINGFACE_TOKEN;
     const app = await getHfApp();
 
-    const result = await app.predict("/predict", [text, voice, parseFloat(speed)]);
+    const paddedText = " . ." + text; 
+    const result = await app.predict("/predict", [paddedText, voice, parseFloat(speed)]);
 
+    
     if (!result.data || !result.data[0]) {
       throw new Error("No audio data returned from Hugging Face.");
     }
