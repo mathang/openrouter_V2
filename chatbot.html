@@ -235,6 +235,22 @@
       box-decoration-break: clone;
       -webkit-box-decoration-break: clone;
     }
+    .copy-button {
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      color: #475569;
+      background: #f8fafc;
+      transition: all 0.2s ease;
+    }
+    .copy-button:hover {
+      color: #0052C4;
+      border-color: rgba(0, 82, 196, 0.6);
+      background: #eff6ff;
+    }
+    .copy-button[data-state="copied"] {
+      color: #0f172a;
+      border-color: rgba(14, 116, 144, 0.55);
+      background: rgba(224, 242, 254, 0.9);
+    }
     @keyframes ttsPulse {
       0%, 100% { transform: scale(1); }
       50% { transform: scale(1.08); }
@@ -256,6 +272,7 @@
       #clinical-toggle,
       #sports-toggle,
       .tts-button,
+      .copy-button,
       #download-chat,
       #speech-options-toggle {
         display: none !important;
@@ -371,10 +388,16 @@
       <img src="./ross pic.png" class="w-10 h-10 rounded-full object-cover border border-slate-200 flex-none self-end mb-1" alt="Bot">
       <div class="space-y-1 max-w-[85%]">
         <div class="text-xs text-slate-500 ml-1">Ro(bot)ss Clark</div>
-        <div class="msg-bot bg-white border border-slate-200 p-4 text-sm leading-relaxed shadow-sm text-slate-800">
+        <div class="msg-bot bg-white border border-slate-200 p-4 text-sm leading-relaxed shadow-sm text-slate-800" data-role="bot-content">
           <p>Hello! I'm your AI assistant for <span class="text-[#0052C4] font-semibold">SPX102 INTRODUCTION TO COACHING</span>.</p>
           <br>
           <p>I can help you understand coaching pedagogy, training principles and other aspects of your course. What should we discuss?</p>
+        </div>
+        <div class="mt-2 flex items-center gap-2 text-xs text-slate-500">
+          <button type="button" class="copy-button inline-flex h-8 w-8 items-center justify-center rounded-full shadow-sm" data-role="copy-button" aria-label="Copy message text" title="Copy text">
+            <i data-lucide="copy" class="w-4 h-4"></i>
+          </button>
+          <span>Copy</span>
         </div>
       </div>
     </div>
@@ -1022,9 +1045,18 @@ ${knowledgeBase}
                     ${formatMessage(content)}
                     ${attachmentHtml}
                 </div>
+                <div class="mt-2 flex items-center justify-end gap-2 text-xs text-slate-600">
+                  <button type="button" class="copy-button inline-flex h-8 w-8 items-center justify-center rounded-full shadow-sm" data-role="copy-button" aria-label="Copy message text" title="Copy text">
+                    <i data-lucide="copy" class="w-4 h-4"></i>
+                  </button>
+                  <span>Copy</span>
+                </div>
             </div>
         `;
         chatLog.appendChild(div);
+        const contentEl = div.querySelector(".msg-user");
+        const copyButton = div.querySelector("[data-role='copy-button']");
+        wireCopyButton(copyButton, contentEl);
         chatLog.scrollTop = chatLog.scrollHeight;
         lucide.createIcons();
     }
@@ -1061,15 +1093,72 @@ ${knowledgeBase}
                     <i data-lucide="volume-2" class="w-4 h-4"></i>
                   </button>
                 </div>
+                <div class="mt-2 flex items-center gap-2 text-xs text-slate-500">
+                  <button type="button" class="copy-button inline-flex h-8 w-8 items-center justify-center rounded-full shadow-sm" data-role="copy-button" aria-label="Copy message text" title="Copy text">
+                    <i data-lucide="copy" class="w-4 h-4"></i>
+                  </button>
+                  <span>Copy</span>
+                </div>
             </div>
         `;
         chatLog.appendChild(div);
         const contentEl = div.querySelector("[data-role='bot-content']");
         const ttsButton = div.querySelector("[data-role='tts-button']");
+        const copyButton = div.querySelector("[data-role='copy-button']");
         ttsButton.addEventListener("click", () => handleTtsButtonClick(ttsButton));
+        wireCopyButton(copyButton, contentEl);
         lucide.createIcons();
         scrollMessageToTop(contentEl);
         return { contentEl, ttsButton };
+    }
+
+    function setCopyButtonState(button, state) {
+      button.dataset.state = state;
+      if (state === "copied") {
+        button.setAttribute("aria-label", "Copied message text");
+        button.setAttribute("title", "Copied");
+        button.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i>';
+      } else {
+        button.setAttribute("aria-label", "Copy message text");
+        button.setAttribute("title", "Copy text");
+        button.innerHTML = '<i data-lucide="copy" class="w-4 h-4"></i>';
+      }
+      lucide.createIcons();
+    }
+
+    async function copyMessageContent(contentEl, button) {
+      if (!contentEl || !button) return;
+      const selection = window.getSelection();
+      if (selection) {
+        selection.removeAllRanges();
+        const range = document.createRange();
+        range.selectNodeContents(contentEl);
+        selection.addRange(range);
+      }
+      const text = contentEl.innerText.trim();
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch (error) {
+        try {
+          document.execCommand("copy");
+        } catch (fallbackError) {
+          console.error("Copy failed", fallbackError);
+        }
+      }
+      setCopyButtonState(button, "copied");
+      setTimeout(() => setCopyButtonState(button, "idle"), 2000);
+    }
+
+    function wireCopyButton(button, contentEl) {
+      if (!button || !contentEl) return;
+      button.addEventListener("click", () => copyMessageContent(contentEl, button));
+    }
+
+    const initialCopyButton = chatLog.querySelector("[data-role='copy-button']");
+    const initialContent = chatLog.querySelector("[data-role='bot-content']");
+    if (initialCopyButton && initialContent) {
+      setCopyButtonState(initialCopyButton, "idle");
+      wireCopyButton(initialCopyButton, initialContent);
     }
 
     function setTtsButtonState(button, state) {
