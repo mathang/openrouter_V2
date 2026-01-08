@@ -538,6 +538,7 @@
     let activeTtsContentEl = null;
     let silenceTimer = null;
     let pausedForResponse = false;
+    let pausedForTts = false;
     let awaitingResponse = false;
     let lastFinalTranscript = "";
 
@@ -1259,7 +1260,7 @@ ${knowledgeBase}
       return sentences;
     }
 
-    function stopActiveAudio() {
+    function stopActiveAudio({ resumeMic = true } = {}) {
       ttsPlaybackToken += 1;
       if (activeAudio) {
         activeAudio.pause();
@@ -1278,6 +1279,9 @@ ${knowledgeBase}
       activeTtsButton = null;
       activeUtterance = null;
       activeTtsContentEl = null;
+      if (resumeMic) {
+        resumeRecognitionAfterTts();
+      }
     }
 
     function detectLanguageTag(text) {
@@ -1314,65 +1318,71 @@ ${knowledgeBase}
       if (!("speechSynthesis" in window)) {
         throw new Error("Speech synthesis is not available.");
       }
-      stopActiveAudio();
+      pauseRecognitionForTts();
+      stopActiveAudio({ resumeMic: false });
       const playbackToken = ttsPlaybackToken;
       setTtsButtonState(button, "loading");
       const sentences = splitIntoSentences(text);
       if (!sentences.length) {
         setTtsButtonState(button, "idle");
+        resumeRecognitionAfterTts();
         return;
       }
       activeTtsButton = button;
       activeTtsContentEl = contentEl || null;
-      return new Promise((resolve, reject) => {
-        let index = 0;
-        const speakNext = () => {
-          if (playbackToken !== ttsPlaybackToken) {
-            resolve();
-            return;
-          }
-          if (index >= sentences.length) {
-            setTtsButtonState(button, "idle");
-            if (activeTtsButton === button) activeTtsButton = null;
-            activeUtterance = null;
-            if (activeTtsContentEl) {
-              clearTtsHighlights(activeTtsContentEl);
-            }
-            resolve();
-            return;
-          }
-          const sentence = sentences[index];
-          const utterance = new SpeechSynthesisUtterance(sentence.text);
-          const voice = selectSpeechSynthesisVoice(lang);
-          if (voice) utterance.voice = voice;
-          utterance.lang = lang;
-          utterance.rate = ttsSpeed;
-          activeUtterance = utterance;
-          if (activeTtsContentEl) {
-            highlightTextRange(activeTtsContentEl, sentence.start, sentence.end);
-          }
-          utterance.onend = () => {
+      try {
+        return await new Promise((resolve, reject) => {
+          let index = 0;
+          const speakNext = () => {
             if (playbackToken !== ttsPlaybackToken) {
               resolve();
               return;
             }
-            index += 1;
-            speakNext();
-          };
-          utterance.onerror = () => {
-            setTtsButtonState(button, "idle");
-            if (activeTtsButton === button) activeTtsButton = null;
-            activeUtterance = null;
-            if (activeTtsContentEl) {
-              clearTtsHighlights(activeTtsContentEl);
+            if (index >= sentences.length) {
+              setTtsButtonState(button, "idle");
+              if (activeTtsButton === button) activeTtsButton = null;
+              activeUtterance = null;
+              if (activeTtsContentEl) {
+                clearTtsHighlights(activeTtsContentEl);
+              }
+              resolve();
+              return;
             }
-            reject(new Error("Unable to play the generated audio."));
+            const sentence = sentences[index];
+            const utterance = new SpeechSynthesisUtterance(sentence.text);
+            const voice = selectSpeechSynthesisVoice(lang);
+            if (voice) utterance.voice = voice;
+            utterance.lang = lang;
+            utterance.rate = ttsSpeed;
+            activeUtterance = utterance;
+            if (activeTtsContentEl) {
+              highlightTextRange(activeTtsContentEl, sentence.start, sentence.end);
+            }
+            utterance.onend = () => {
+              if (playbackToken !== ttsPlaybackToken) {
+                resolve();
+                return;
+              }
+              index += 1;
+              speakNext();
+            };
+            utterance.onerror = () => {
+              setTtsButtonState(button, "idle");
+              if (activeTtsButton === button) activeTtsButton = null;
+              activeUtterance = null;
+              if (activeTtsContentEl) {
+                clearTtsHighlights(activeTtsContentEl);
+              }
+              reject(new Error("Unable to play the generated audio."));
+            };
+            window.speechSynthesis.speak(utterance);
           };
-          window.speechSynthesis.speak(utterance);
-        };
-        window.speechSynthesis.cancel();
-        speakNext();
-      });
+          window.speechSynthesis.cancel();
+          speakNext();
+        });
+      } finally {
+        resumeRecognitionAfterTts();
+      }
     }
 
    // A simple queue to hold pre-fetched audio blobs
@@ -1388,7 +1398,8 @@ async function playTtsForText(text, button, contentEl) {
     return;
   }
 
-  stopActiveAudio();
+  pauseRecognitionForTts();
+  stopActiveAudio({ resumeMic: false });
   const playbackToken = ttsPlaybackToken;
   setTtsButtonState(button, "loading");
   activeTtsButton = button;
@@ -1436,6 +1447,7 @@ async function playTtsForText(text, button, contentEl) {
       activeTtsButton = null;
       activeTtsContentEl = null;
     }
+    resumeRecognitionAfterTts();
   }
 }
 
@@ -1906,7 +1918,7 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
     }
 
     function startListening() {
-      if (!recognitionSupported || !recognition || isListening || pausedForResponse) return;
+      if (!recognitionSupported || !recognition || isListening || pausedForResponse || pausedForTts) return;
       speechBuffer = "";
       lastFinalTranscript = "";
       try {
@@ -1943,13 +1955,31 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
     function resumeRecognitionAfterResponse() {
       if (!recognitionSupported) return;
       pausedForResponse = false;
+      if (pausedForTts) return;
       if (speechMode === SpeechMode.CONTINUOUS) {
         startListening();
       }
     }
 
+    function pauseRecognitionForTts() {
+      if (!recognitionSupported) return;
+      if (speechMode !== SpeechMode.CONTINUOUS) return;
+      pausedForTts = true;
+      stopListening();
+    }
+
+    function resumeRecognitionAfterTts() {
+      if (!recognitionSupported) return;
+      if (!pausedForTts) return;
+      pausedForTts = false;
+      if (speechMode === SpeechMode.CONTINUOUS && !pausedForResponse && !awaitingResponse) {
+        startListening();
+      }
+    }
+
     function updateMicButtonUI() {
-      const icon = speechMode === SpeechMode.OFF ? "mic-off" : pausedForResponse ? "pause-circle" : "mic";
+      const isPaused = pausedForResponse || pausedForTts;
+      const icon = speechMode === SpeechMode.OFF ? "mic-off" : isPaused ? "pause-circle" : "mic";
       micBtn.innerHTML = `<i data-lucide="${icon}" class="w-5 h-5"></i>`;
       lucide.createIcons();
       micModeLabel.textContent = speechModeLabels[speechMode] || "Speech off";
@@ -1969,6 +1999,7 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
       speechMode = mode;
       speechBuffer = "";
       pausedForResponse = false;
+      pausedForTts = false;
       clearTimeout(silenceTimer);
       if (speechMode === SpeechMode.OFF) {
         stopListening();
