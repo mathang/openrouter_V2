@@ -513,6 +513,7 @@
     let focusState = { clinical: false, sports: false };
     let pendingFocusInstruction = "";
     let activeAudio = null;
+    let globalAudioElement = new Audio();
     let activeTtsButton = null;
     let activeUtterance = null;
     let lastUserPrompt = "";
@@ -1468,8 +1469,7 @@ async function fetchAudioBlob(text) {
 function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackToken) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
-    activeAudio = audio;
+    activeAudio = globalAudioElement;
 
     if (playbackToken !== ttsPlaybackToken) {
       URL.revokeObjectURL(url);
@@ -1481,18 +1481,22 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
       highlightTextRange(contentEl, sentenceMetadata.start, sentenceMetadata.end);
     }
 
-    audio.onended = () => {
+    activeAudio.onended = () => {
       URL.revokeObjectURL(url);
       resolve();
     };
-    audio.onpause = () => {
+    activeAudio.onpause = () => {
       if (playbackToken !== ttsPlaybackToken) {
         URL.revokeObjectURL(url);
         resolve();
       }
     };
-    audio.onerror = reject;
-    audio.play().catch(reject);
+    activeAudio.onerror = (event) => {
+      URL.revokeObjectURL(url);
+      reject(event);
+    };
+    activeAudio.src = url;
+    activeAudio.play().catch(reject);
   });
 }
 
