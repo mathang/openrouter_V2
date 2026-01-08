@@ -10,6 +10,7 @@
 - Decision: Prefer ESM syntax for Netlify functions to align with `netlify/functions/package.json` and prevent handler export mismatches.
 - Decision: Centralize serverless function dependencies at the repo root so Netlify’s esbuild can resolve them during bundling.
 - Decision: Use `window.print()` for conversation exports to avoid unreliable file-download flows on mobile browsers.
+- Decision: Cache the Hugging Face TTS client connection at module scope to avoid cold-start connection overhead.
 
 ## Common errors and resolutions
 
@@ -19,3 +20,5 @@
   Resolution: Install `firebase-admin` at the repository root and update the root `package.json` (and lockfile if present).
 - Error: Conversation export fails on Android browsers.
   Resolution: Use the print dialog (`window.print()`) instead of file download.
+- Error: First sentences of TTS playback sound low quality after a cold or warm start.
+  Resolution: Reuse a cached `@gradio/client` connection at module scope in `netlify/functions/hf-tts.js` to reduce initial connection overhead.

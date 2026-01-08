@@ -5,6 +5,21 @@ import { Client } from "@gradio/client";
  * Handles communication with Hugging Face Kokoro-TTS Space
  * IMPORTANT: Ensure package.json has "type": "module" and "@gradio/client" dependency.
  */
+let cachedAppPromise;
+
+const getHfApp = async () => {
+  if (!cachedAppPromise) {
+    const hfToken = process.env.HF_TOKEN || process.env.HUGGINGFACE_TOKEN;
+    cachedAppPromise = hfToken
+      ? Client.connect("https://deaconhead-kokoro-tts.hf.space", {
+          hf_token: hfToken,
+        })
+      : Client.connect("https://deaconhead-kokoro-tts.hf.space");
+  }
+
+  return cachedAppPromise;
+};
+
 export const handler = async (event) => {
   // CORS Preflight handling
   if (event.httpMethod === "OPTIONS") {
@@ -38,11 +53,7 @@ export const handler = async (event) => {
     console.log(`Connecting to Kokoro-TTS for text: "${text.substring(0, 20)}..."`);
 
     const hfToken = process.env.HF_TOKEN || process.env.HUGGINGFACE_TOKEN;
-    const app = hfToken
-      ? await Client.connect("https://deaconhead-kokoro-tts.hf.space", {
-          hf_token: hfToken,
-        })
-      : await Client.connect("https://deaconhead-kokoro-tts.hf.space");
+    const app = await getHfApp();
 
     const result = await app.predict("/predict", [text, voice, parseFloat(speed)]);
 
@@ -50,13 +61,15 @@ export const handler = async (event) => {
       throw new Error("No audio data returned from Hugging Face.");
     }
 
-   const audioUrl = result.data[0].url;
+    const audioUrl = result.data[0].url;
 
     // MODIFIED: Include the Authorization header to download from a Private Space
     const audioResponse = await fetch(audioUrl, {
-      headers: {
-        "Authorization": `Bearer ${hfToken}`
-      }
+      headers: hfToken
+        ? {
+            Authorization: `Bearer ${hfToken}`,
+          }
+        : undefined,
     });
 
     if (!audioResponse.ok) {
