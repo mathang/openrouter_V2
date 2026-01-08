@@ -1242,7 +1242,7 @@ ${knowledgeBase}
     function splitIntoSentences(text) {
       const sentences = [];
       if (!text) return sentences;
-      const regex = /[^.!?\;;:]+[.!?\;;:]+|[^.!?\;;:]+$/g;
+      const regex = /[^.!?;:]+[.!?;:]+(?:["'”’]+)?|[^.!?;:]+$/g;
       let match;
       let offset = 0;
       while ((match = regex.exec(text)) !== null) {
