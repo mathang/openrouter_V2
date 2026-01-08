@@ -524,6 +524,7 @@
     let ttsVoice = "female";
     let ttsPlaybackToken = 0;
     let availableVoices = [];
+    let autoTtsEnabled = false;
     let pdfAttachment = null;
 
     // --- SPEECH RECOGNITION ---
@@ -1499,10 +1500,17 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
       const contentEl = button.closest(".space-y-1")?.querySelector("[data-role='bot-content']");
       const text = contentEl ? getContainerText(contentEl).trim() : button.dataset.ttsText?.trim();
       if (button.dataset.state === "loading") {
+        autoTtsEnabled = false;
+        stopActiveAudio();
+        return;
+      }
+      if (autoTtsEnabled) {
+        autoTtsEnabled = false;
         stopActiveAudio();
         return;
       }
       if (!text) return;
+      autoTtsEnabled = true;
       errorSpan.textContent = "";
       if (!narrativeModeEnabled && contentEl) {
         await handleNarrativeModeRequest({ button, contentEl });
@@ -1768,11 +1776,15 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
     async function streamAssistantResponse() {
       const { contentEl: botContentEl, ttsButton } = addBotMessage("");
       ttsButton.dataset.userPrompt = lastUserPrompt;
-      return streamAssistantResponseInto({
+      const assistantReply = await streamAssistantResponseInto({
         messagesToSend: messages,
         contentEl: botContentEl,
         ttsButton,
       });
+      if (assistantReply && autoTtsEnabled) {
+        await playTtsForText(assistantReply, ttsButton, botContentEl);
+      }
+      return assistantReply;
     }
 
     async function handleNarrativeModeRequest({ button, contentEl }) {
@@ -2066,11 +2078,14 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
       if (looksLikeCrisis(cleanedText)) {
         setTimeout(() => {
             const supportText = crisisResponse();
-            const { ttsButton } = addBotMessage(supportText);
+            const { contentEl, ttsButton } = addBotMessage(supportText);
             setTtsButtonText(ttsButton, supportText);
             ttsButton.dataset.userPrompt = cleanedText;
             messages.push({ role: "assistant", content: supportText });
             logToFirebase("assistant", supportText);
+            if (autoTtsEnabled) {
+              playTtsForText(supportText, ttsButton, contentEl);
+            }
             awaitingResponse = false;
             setTyping(false);
             resumeRecognitionAfterResponse();
