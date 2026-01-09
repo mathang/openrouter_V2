@@ -57,7 +57,6 @@ export const handler = async (event, context) => {
     })}\n\n`;
 
   const models = [
-    "google/gemini-2.0-flash-lite-001",
     "google/gemini-2.5-flash-lite",
     "google/gemini-3-flash-preview",
     "google/gemma-3-27b-it:free",
