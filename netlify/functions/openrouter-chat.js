@@ -57,7 +57,7 @@ export const handler = async (event, context) => {
     })}\n\n`;
 
   const models = [
-    "meta-llama/llama-4-maverick",
+    "x-ai/grok-4-fast",
     "google/gemini-2.5-flash-lite",
     "google/gemini-3-flash-preview",
     "google/gemma-3-27b-it:free",
