@@ -57,7 +57,7 @@ export const handler = async (event, context) => {
     })}\n\n`;
 
   const models = [
-    "moonshotai/kimi-k2-thinking",
+    "moonshotai/kimi-k2-0905",
     "google/gemini-2.5-flash-lite",
     "google/gemini-3-flash-preview",
     "google/gemma-3-27b-it:free",
