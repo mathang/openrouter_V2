@@ -58,7 +58,7 @@ export const handler = async (event, context) => {
 
   const models = [
     // "google/gemini-2.5-flash-lite",
-    "openai/gpt-oss-20b:free"
+    "openai/gpt-oss-20b"
     "google/gemini-3-flash-preview",
     "google/gemma-3-27b-it:free",
     "openai/gpt-oss-20b:free",
