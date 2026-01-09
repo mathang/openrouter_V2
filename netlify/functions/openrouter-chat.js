@@ -57,7 +57,7 @@ export const handler = async (event, context) => {
     })}\n\n`;
 
   const models = [
-    "openai/gpt-5.2",
+    "google/gemini-3-pro-preview",
     "google/gemini-2.5-flash-lite",
     "google/gemini-3-flash-preview",
     "google/gemma-3-27b-it:free",
