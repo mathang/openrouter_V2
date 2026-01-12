@@ -522,6 +522,7 @@
     let lastUserPrompt = "";
     let narrativeModeEnabled = false;
     let narrativeModeInFlight = false;
+    let tutorModeEnabled = false;
     const ttsSpeedOptions = [1, 1.5, 2];
     let ttsSpeed = 1;
     let ttsEngine = "huggingface";
@@ -3216,6 +3217,18 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
       contentEl.appendChild(optionsContainer);
     }
 
+    function exitTutorMode() {
+      tutorModeEnabled = false;
+      clearFollowupSuggestions();
+    }
+
+    function startTutorMode() {
+      tutorModeEnabled = true;
+      const kickoffPrompt =
+        "Start the Socratic tutoring now based on the topic we are discussing.";
+      handleUserMessage(kickoffPrompt);
+    }
+
     async function requestQuizFromModel() {
       clearFollowupSuggestions();
       const quizPrompt = `Create a multiple-choice question based on our conversation so far.
@@ -3272,6 +3285,19 @@ Do not include the correct answer or any extra text.`;
     function renderFollowupSuggestions(container, suggestions) {
       clearFollowupSuggestions();
       if (!container) return;
+      if (tutorModeEnabled) {
+        const exitButton = document.createElement("button");
+        exitButton.type = "button";
+        exitButton.className =
+          "followup-button inline-flex items-center gap-2 rounded-full bg-[#0052C4] px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#1a73e8]";
+        exitButton.textContent = "Exit Tutor Mode";
+        exitButton.addEventListener("click", () => {
+          exitTutorMode();
+        });
+        container.appendChild(exitButton);
+        container.classList.remove("hidden");
+        return;
+      }
       const fixedSuggestions = [
         {
           type: "example",
@@ -3281,6 +3307,10 @@ Do not include the correct answer or any extra text.`;
         {
           type: "quiz",
           text: "Quiz Me",
+        },
+        {
+          type: "tutor",
+          text: "Tutor Me",
         },
       ];
       fixedSuggestions.forEach((suggestion) => {
@@ -3293,6 +3323,10 @@ Do not include the correct answer or any extra text.`;
           clearFollowupSuggestions();
           if (suggestion.type === "quiz") {
             requestQuizFromModel();
+            return;
+          }
+          if (suggestion.type === "tutor") {
+            startTutorMode();
             return;
           }
           handleUserMessage(suggestion.prompt);
@@ -3553,12 +3587,20 @@ Do not include the correct answer or any extra text.`;
       lastUserPrompt = fallbackPrompt;
       const narrativeUserInstruction =
         "You must respond in narrative format with no tables or bullet points.";
+      const tutorModeInstruction = `You are a Socratic tutor. Your goal is to guide me to understand the topic we are discussing.
+Do not give me direct answers. Instead, ask probing, open-ended questions one at a time.
+Wait for my response before asking the next question.
+Help me identify gaps in my reasoning, challenge assumptions, and build my own understanding.
+Continue until I can explain the concept back to you.
+
+Start by asking me what I already know about the topic we are discussing.`;
       const followupInstruction =
         "Append at least one follow-up prompt after your answer exactly as specified in the system instructions.";
 
       const focusPrefix = pendingFocusInstruction ? `${pendingFocusInstruction}. ` : "";
       const narrativePrefix = narrativeModeEnabled ? `${narrativeUserInstruction} ` : "";
-      const messageToSend = `${focusPrefix}${narrativePrefix}${fallbackPrompt}\n\n${followupInstruction}`.trim();
+      const tutorPrefix = tutorModeEnabled ? `${tutorModeInstruction} ` : "";
+      const messageToSend = `${focusPrefix}${narrativePrefix}${tutorPrefix}${fallbackPrompt}\n\n${followupInstruction}`.trim();
       pendingFocusInstruction = "";
 
       const userLogText = cleanedText || "PDF attached.";
