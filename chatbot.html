@@ -2944,11 +2944,24 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
     }
 
     function getVisibleAssistantContent(rawText) {
-      const delimiterIndex = rawText.indexOf("<<<FOLLOWUPS>>>");
-      if (delimiterIndex === -1) {
+      const startToken = "<<<FOLLOWUPS>>>";
+      const endToken = "<<<END_FOLLOWUPS>>>";
+      const startIndex = rawText.indexOf(startToken);
+      const endIndex = rawText.indexOf(endToken);
+      let cutIndex = -1;
+
+      if (startIndex !== -1 && endIndex !== -1) {
+        cutIndex = Math.min(startIndex, endIndex);
+      } else if (startIndex !== -1) {
+        cutIndex = startIndex;
+      } else if (endIndex !== -1) {
+        cutIndex = endIndex;
+      }
+
+      if (cutIndex === -1) {
         return rawText;
       }
-      return rawText.slice(0, delimiterIndex).trimEnd();
+      return rawText.slice(0, cutIndex).trimEnd();
     }
 
     function extractFollowupsFromContent(rawText) {
@@ -2956,6 +2969,10 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
       const endToken = "<<<END_FOLLOWUPS>>>";
       const startIndex = rawText.indexOf(startToken);
       if (startIndex === -1) {
+        const endIndex = rawText.indexOf(endToken);
+        if (endIndex !== -1) {
+          return { mainText: rawText.slice(0, endIndex).trim(), followups: [] };
+        }
         return { mainText: rawText.trim(), followups: [] };
       }
       const endIndex = rawText.indexOf(endToken, startIndex + startToken.length);
