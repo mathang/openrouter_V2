@@ -2103,11 +2103,11 @@ You MUST follow these rules exactly:
    - Provide up to three prompts, in this order when appropriate:
      1) Socratic tutor question
      2) Request for a specific example
-     3) Lucky dip: short story, poem, or historical example
+     3) Lucky dip: short story or poem
    - If a type is not appropriate, omit it. Ensure at least one prompt remains.
    - When you include follow-ups, append them AFTER the main answer as a JSON array between the markers:
      <<<FOLLOWUPS>>>
-     [{"type":"socratic","text":"..."},{"type":"example","text":"..."},{"type":"lucky_dip","text":"Lucky dip - short story, poem or history"}]
+     [{"type":"socratic","text":"..."},{"type":"example","text":"..."},{"type":"lucky_dip","text":"Lucky dip - short story or poem"}]
      <<<END_FOLLOWUPS>>>
    - If no follow-ups, omit the markers entirely.
 
@@ -3128,7 +3128,7 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
     function renderFollowupSuggestions(container, suggestions) {
       clearFollowupSuggestions();
       if (!container) return;
-      const order = ["socratic", "example", "lucky_dip"];
+      const order = ["socratic", "example"];
       const seenInResponse = new Set();
       const filteredSuggestions = order
         .map((type) => suggestions.find((item) => item?.type === type))
@@ -3140,11 +3140,14 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
           seenInResponse.add(normalized);
           return true;
         })
-        .slice(0, 3);
+        .slice(0, 2);
       if (!filteredSuggestions.length) {
         const fallbackText = `What's the most important takeaway from that answer?`;
         filteredSuggestions.push({ type: "socratic", text: fallbackText });
       }
+      const luckyDipSuggestion = suggestions.find((item) => item?.type === "lucky_dip");
+      const luckyDipText = luckyDipSuggestion?.text || "Lucky dip - short story or poem";
+      filteredSuggestions.push({ type: "lucky_dip", text: luckyDipText });
       if (!filteredSuggestions.length) return;
       filteredSuggestions.forEach((suggestion) => {
         const button = document.createElement("button");
@@ -3157,7 +3160,6 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
           const luckyDipPrompts = [
             "Generate a short story based on the SPX102 coaching notes and our conversation so far.",
             "Generate a poem based on the SPX102 coaching notes and our conversation so far.",
-            "Find a historical example from the SPX102 coaching notes that fits our conversation so far.",
           ];
           const nextPrompt =
             suggestion.type === "lucky_dip"
