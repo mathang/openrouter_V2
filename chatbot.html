@@ -530,7 +530,6 @@
     let availableVoices = [];
     let autoTtsEnabled = false;
     let pdfAttachment = null;
-    const followupSuggestionHistory = new Set();
 
     // --- SPEECH RECOGNITION ---
     const SpeechMode = { OFF: 0, PUSH_TO_TALK: 1, CONTINUOUS: 2 };
@@ -2104,11 +2103,11 @@ You MUST follow these rules exactly:
    - Provide up to three prompts, in this order when appropriate:
      1) Socratic tutor question
      2) Request for a specific example
-     3) Short mnemonic learning device
+     3) Lucky dip: short story, poem, or historical example
    - If a type is not appropriate, omit it. Ensure at least one prompt remains.
    - When you include follow-ups, append them AFTER the main answer as a JSON array between the markers:
      <<<FOLLOWUPS>>>
-     [{"type":"socratic","text":"..."},{"type":"example","text":"..."},{"type":"mnemonic","text":"..."}]
+     [{"type":"socratic","text":"..."},{"type":"example","text":"..."},{"type":"lucky_dip","text":"Lucky dip - short story, poem or history"}]
      <<<END_FOLLOWUPS>>>
    - If no follow-ups, omit the markers entirely.
 
@@ -3129,17 +3128,22 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
     function renderFollowupSuggestions(container, suggestions) {
       clearFollowupSuggestions();
       if (!container) return;
-      const order = ["socratic", "example", "mnemonic"];
+      const order = ["socratic", "example", "lucky_dip"];
+      const seenInResponse = new Set();
       const filteredSuggestions = order
         .map((type) => suggestions.find((item) => item?.type === type))
         .filter(Boolean)
-        .filter((item) => item?.text && !followupSuggestionHistory.has(normalizeFollowupText(item.text)))
+        .filter((item) => {
+          if (!item?.text) return false;
+          const normalized = normalizeFollowupText(item.text);
+          if (seenInResponse.has(normalized)) return false;
+          seenInResponse.add(normalized);
+          return true;
+        })
         .slice(0, 3);
       if (!filteredSuggestions.length) {
         const fallbackText = `What's the most important takeaway from that answer?`;
-        if (!followupSuggestionHistory.has(normalizeFollowupText(fallbackText))) {
-          filteredSuggestions.push({ type: "socratic", text: fallbackText });
-        }
+        filteredSuggestions.push({ type: "socratic", text: fallbackText });
       }
       if (!filteredSuggestions.length) return;
       filteredSuggestions.forEach((suggestion) => {
@@ -3150,10 +3154,18 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
         button.textContent = suggestion.text;
         button.addEventListener("click", () => {
           clearFollowupSuggestions();
-          handleUserMessage(suggestion.text);
+          const luckyDipPrompts = [
+            "Generate a short story based on the SPX102 coaching notes and our conversation so far.",
+            "Generate a poem based on the SPX102 coaching notes and our conversation so far.",
+            "Find a historical example from the SPX102 coaching notes that fits our conversation so far.",
+          ];
+          const nextPrompt =
+            suggestion.type === "lucky_dip"
+              ? luckyDipPrompts[Math.floor(Math.random() * luckyDipPrompts.length)]
+              : suggestion.text;
+          handleUserMessage(nextPrompt);
         });
         container.appendChild(button);
-        followupSuggestionHistory.add(normalizeFollowupText(suggestion.text));
       });
       container.classList.remove("hidden");
     }
