@@ -3145,37 +3145,20 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
     function renderFollowupSuggestions(container, suggestions) {
       clearFollowupSuggestions();
       if (!container) return;
-      const order = ["socratic", "example"];
-      const seenInResponse = new Set();
-      const filteredSuggestions = [];
-      const hasText = (item) => item?.text && item.text.trim();
-      const addSuggestion = (item) => {
-        if (!hasText(item)) return;
-        const normalized = normalizeFollowupText(item.text);
-        if (seenInResponse.has(normalized)) return;
-        seenInResponse.add(normalized);
-        filteredSuggestions.push(item);
-      };
-
-      order.forEach((type) => {
-        const match = suggestions.find((item) => item?.type === type);
-        if (match) addSuggestion(match);
-      });
-
-      suggestions
-        .filter((item) => item?.type !== "lucky_dip" && !order.includes(item?.type))
-        .forEach((item) => addSuggestion(item));
-
-      filteredSuggestions.splice(2);
-      if (!filteredSuggestions.length) {
-        const fallbackText = `What's the most important takeaway from that answer?`;
-        filteredSuggestions.push({ type: "socratic", text: fallbackText });
-      }
-      const luckyDipSuggestion = suggestions.find((item) => item?.type === "lucky_dip");
-      const luckyDipText = luckyDipSuggestion?.text || "Lucky dip - short story or poem";
-      filteredSuggestions.push({ type: "lucky_dip", text: luckyDipText });
-      if (!filteredSuggestions.length) return;
-      filteredSuggestions.forEach((suggestion) => {
+      const fixedSuggestions = [
+        {
+          type: "example",
+          text: "Provide an Example",
+          prompt: "Provide a specific example related to your last response.",
+        },
+        {
+          type: "quiz",
+          text: "Quiz Me",
+          prompt:
+            "Create a multiple-choice question based on our conversation so far. Provide four options labeled A-D and indicate the correct answer.",
+        },
+      ];
+      fixedSuggestions.forEach((suggestion) => {
         const button = document.createElement("button");
         button.type = "button";
         button.className =
@@ -3183,15 +3166,7 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
         button.textContent = suggestion.text;
         button.addEventListener("click", () => {
           clearFollowupSuggestions();
-          const luckyDipPrompts = [
-            "Generate a short story based on the SPX102 coaching notes and our conversation so far.",
-            "Generate a poem based on the SPX102 coaching notes and our conversation so far.",
-          ];
-          const nextPrompt =
-            suggestion.type === "lucky_dip"
-              ? luckyDipPrompts[Math.floor(Math.random() * luckyDipPrompts.length)]
-              : suggestion.text;
-          handleUserMessage(nextPrompt);
+          handleUserMessage(suggestion.prompt);
         });
         container.appendChild(button);
       });
