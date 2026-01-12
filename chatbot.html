@@ -3147,17 +3147,26 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
       if (!container) return;
       const order = ["socratic", "example"];
       const seenInResponse = new Set();
-      const filteredSuggestions = order
-        .map((type) => suggestions.find((item) => item?.type === type))
-        .filter(Boolean)
-        .filter((item) => {
-          if (!item?.text) return false;
-          const normalized = normalizeFollowupText(item.text);
-          if (seenInResponse.has(normalized)) return false;
-          seenInResponse.add(normalized);
-          return true;
-        })
-        .slice(0, 2);
+      const filteredSuggestions = [];
+      const hasText = (item) => item?.text && item.text.trim();
+      const addSuggestion = (item) => {
+        if (!hasText(item)) return;
+        const normalized = normalizeFollowupText(item.text);
+        if (seenInResponse.has(normalized)) return;
+        seenInResponse.add(normalized);
+        filteredSuggestions.push(item);
+      };
+
+      order.forEach((type) => {
+        const match = suggestions.find((item) => item?.type === type);
+        if (match) addSuggestion(match);
+      });
+
+      suggestions
+        .filter((item) => item?.type !== "lucky_dip" && !order.includes(item?.type))
+        .forEach((item) => addSuggestion(item));
+
+      filteredSuggestions.splice(2);
       if (!filteredSuggestions.length) {
         const fallbackText = `What's the most important takeaway from that answer?`;
         filteredSuggestions.push({ type: "socratic", text: fallbackText });
