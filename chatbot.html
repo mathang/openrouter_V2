@@ -2099,13 +2099,13 @@ You MUST follow these rules exactly:
    - When describing workflows, display the steps as a vertical list with emoji bullet points. Use bold headers for the action on each bullet, followed by details. Put "Tools" and "Why" on separate lines under the header.
    - If you provide follow-up prompts, they must be answerable using the knowledge base and aligned with the course content.
 
-4. FOLLOW-UP PROMPTS (OPTIONAL)
-   - Only include follow-up prompts when you are confident they will help the learner.
+4. FOLLOW-UP PROMPTS (REQUIRED)
+   - Always include at least one follow-up prompt.
    - Provide up to three prompts, in this order when appropriate:
      1) Socratic tutor question
      2) Request for a specific example
      3) Short mnemonic learning device
-   - If a type is not appropriate or you are not confident, omit it.
+   - If a type is not appropriate, omit it. Ensure at least one prompt remains.
    - When you include follow-ups, append them AFTER the main answer as a JSON array between the markers:
      <<<FOLLOWUPS>>>
      [{"type":"socratic","text":"..."},{"type":"example","text":"..."},{"type":"mnemonic","text":"..."}]
@@ -3128,13 +3128,19 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
 
     function renderFollowupSuggestions(container, suggestions) {
       clearFollowupSuggestions();
-      if (!container || !suggestions.length) return;
+      if (!container) return;
       const order = ["socratic", "example", "mnemonic"];
       const filteredSuggestions = order
         .map((type) => suggestions.find((item) => item?.type === type))
         .filter(Boolean)
         .filter((item) => item?.text && !followupSuggestionHistory.has(normalizeFollowupText(item.text)))
         .slice(0, 3);
+      if (!filteredSuggestions.length) {
+        const fallbackText = `What's the most important takeaway from that answer?`;
+        if (!followupSuggestionHistory.has(normalizeFollowupText(fallbackText))) {
+          filteredSuggestions.push({ type: "socratic", text: fallbackText });
+        }
+      }
       if (!filteredSuggestions.length) return;
       filteredSuggestions.forEach((suggestion) => {
         const button = document.createElement("button");
@@ -3404,7 +3410,7 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
       const narrativeUserInstruction =
         "You must respond in narrative format with no tables or bullet points.";
       const followupInstruction =
-        "If helpful, append follow-up prompts after your answer exactly as specified in the system instructions.";
+        "Append at least one follow-up prompt after your answer exactly as specified in the system instructions.";
 
       const focusPrefix = pendingFocusInstruction ? `${pendingFocusInstruction}. ` : "";
       const narrativePrefix = narrativeModeEnabled ? `${narrativeUserInstruction} ` : "";
