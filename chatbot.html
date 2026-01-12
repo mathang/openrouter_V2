@@ -523,6 +523,15 @@
     let narrativeModeEnabled = false;
     let narrativeModeInFlight = false;
     let tutorModeEnabled = false;
+    const tutorModeSystemInstruction = `You are a Socratic tutor. Your goal is to guide me to understand the topic we are discussing.
+Do not give me direct answers. Instead, ask probing, open-ended questions one at a time.
+Wait for my response before asking the next question.
+Help me identify gaps in my reasoning, challenge assumptions, and build my own understanding.
+Continue until I can explain the concept back to you.
+
+Start by asking me what I already know about the topic we are discussing.`;
+    const tutorModeExitInstruction =
+      "Exit Socratic tutor mode and respond in the default helpful assistant style with direct answers.";
     const ttsSpeedOptions = [1, 1.5, 2];
     let ttsSpeed = 1;
     let ttsEngine = "huggingface";
@@ -3218,12 +3227,16 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
     }
 
     function exitTutorMode() {
+      if (!tutorModeEnabled) return;
       tutorModeEnabled = false;
       clearFollowupSuggestions();
+      messages.push({ role: "system", content: tutorModeExitInstruction });
     }
 
     function startTutorMode() {
+      if (tutorModeEnabled) return;
       tutorModeEnabled = true;
+      messages.push({ role: "system", content: tutorModeSystemInstruction });
       const kickoffPrompt =
         "Start the Socratic tutoring now based on the topic we are discussing.";
       handleUserMessage(kickoffPrompt);
@@ -3587,20 +3600,12 @@ Do not include the correct answer or any extra text.`;
       lastUserPrompt = fallbackPrompt;
       const narrativeUserInstruction =
         "You must respond in narrative format with no tables or bullet points.";
-      const tutorModeInstruction = `You are a Socratic tutor. Your goal is to guide me to understand the topic we are discussing.
-Do not give me direct answers. Instead, ask probing, open-ended questions one at a time.
-Wait for my response before asking the next question.
-Help me identify gaps in my reasoning, challenge assumptions, and build my own understanding.
-Continue until I can explain the concept back to you.
-
-Start by asking me what I already know about the topic we are discussing.`;
       const followupInstruction =
         "Append at least one follow-up prompt after your answer exactly as specified in the system instructions.";
 
       const focusPrefix = pendingFocusInstruction ? `${pendingFocusInstruction}. ` : "";
       const narrativePrefix = narrativeModeEnabled ? `${narrativeUserInstruction} ` : "";
-      const tutorPrefix = tutorModeEnabled ? `${tutorModeInstruction} ` : "";
-      const messageToSend = `${focusPrefix}${narrativePrefix}${tutorPrefix}${fallbackPrompt}\n\n${followupInstruction}`.trim();
+      const messageToSend = `${focusPrefix}${narrativePrefix}${fallbackPrompt}\n\n${followupInstruction}`.trim();
       pendingFocusInstruction = "";
 
       const userLogText = cleanedText || "PDF attached.";
