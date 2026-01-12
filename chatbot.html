@@ -2106,7 +2106,7 @@ You MUST follow these rules exactly:
      2) Request for a specific example
      3) Short mnemonic learning device
    - If a type is not appropriate or you are not confident, omit it.
-   - Output follow-ups in a JSON array between the markers:
+   - When you include follow-ups, append them AFTER the main answer as a JSON array between the markers:
      <<<FOLLOWUPS>>>
      [{"type":"socratic","text":"..."},{"type":"example","text":"..."},{"type":"mnemonic","text":"..."}]
      <<<END_FOLLOWUPS>>>
@@ -3403,10 +3403,12 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
       lastUserPrompt = fallbackPrompt;
       const narrativeUserInstruction =
         "You must respond in narrative format with no tables or bullet points.";
+      const followupInstruction =
+        "If helpful, append follow-up prompts after your answer exactly as specified in the system instructions.";
 
       const focusPrefix = pendingFocusInstruction ? `${pendingFocusInstruction}. ` : "";
       const narrativePrefix = narrativeModeEnabled ? `${narrativeUserInstruction} ` : "";
-      const messageToSend = `${focusPrefix}${narrativePrefix}${fallbackPrompt}`.trim();
+      const messageToSend = `${focusPrefix}${narrativePrefix}${fallbackPrompt}\n\n${followupInstruction}`.trim();
       pendingFocusInstruction = "";
 
       const userLogText = cleanedText || "PDF attached.";
