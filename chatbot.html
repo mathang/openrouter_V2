@@ -532,6 +532,8 @@ Continue until I can explain the concept back to you.
 Start by asking me what I already know about the topic we are discussing.`;
     const tutorModeExitInstruction =
       "Exit Socratic tutor mode and respond in the default helpful assistant style with direct answers.";
+    const tutorModeExitPrompt =
+      "I’m done with the Socratic tutor mode exercise. Please just explain the concept to me plainly now.";
     const ttsSpeedOptions = [1, 1.5, 2];
     let ttsSpeed = 1;
     let ttsEngine = "huggingface";
@@ -2142,7 +2144,9 @@ ${knowledgeBase}
         .replace(/\s{2,}/g, " ");
       const escaped = escapeHtml(cleaned);
       const bolded = escaped.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-      return bolded.replace(/_(.*?)_/g, "<em>$1</em>");
+      const italicized = bolded.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+      const emphasized = italicized.replace(/_(.*?)_/g, "<em>$1</em>");
+      return emphasized.replace(/\*/g, "");
     }
 
     function renderTable(lines, startIndex) {
@@ -3231,6 +3235,7 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
       tutorModeEnabled = false;
       clearFollowupSuggestions();
       messages.push({ role: "system", content: tutorModeExitInstruction });
+      handleUserMessage(tutorModeExitPrompt);
     }
 
     function startTutorMode() {
