@@ -3000,6 +3000,7 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
       contentEl,
       ttsButton,
       expectFollowups = true,
+      renderWhileStreaming = true,
     }) {
       const decoder = new TextDecoder();
       let assistantContent = "";
@@ -3094,10 +3095,12 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
             const delta = parsed?.choices?.[0]?.delta?.content || "";
             if (delta) {
               assistantContent += delta;
-              const visibleContent = expectFollowups
-                ? getVisibleAssistantContent(assistantContent)
-                : assistantContent;
-              contentEl.innerHTML = formatMessage(visibleContent);
+              if (renderWhileStreaming) {
+                const visibleContent = expectFollowups
+                  ? getVisibleAssistantContent(assistantContent)
+                  : assistantContent;
+                contentEl.innerHTML = formatMessage(visibleContent);
+              }
             }
 
             const finishReason = parsed?.choices?.[0]?.finish_reason;
@@ -3142,6 +3145,130 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
       });
     }
 
+    function extractQuizFromContent(rawText) {
+      const startToken = "<<<QUIZ>>>";
+      const endToken = "<<<END_QUIZ>>>";
+      let jsonBlock = rawText.trim();
+      const startIndex = rawText.indexOf(startToken);
+      if (startIndex !== -1) {
+        const endIndex = rawText.indexOf(endToken, startIndex + startToken.length);
+        if (endIndex === -1) return null;
+        jsonBlock = rawText
+          .slice(startIndex + startToken.length, endIndex)
+          .trim()
+          .replace(/^```(?:json)?/i, "")
+          .replace(/```$/i, "")
+          .trim();
+      }
+      try {
+        const parsed = JSON.parse(jsonBlock);
+        const question = parsed?.question?.trim();
+        const options = Array.isArray(parsed?.options) ? parsed.options : [];
+        if (!question || !options.length) return null;
+        return { question, options };
+      } catch (err) {
+        return null;
+      }
+    }
+
+    function normalizeQuizOptions(options) {
+      const labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+      return options
+        .map((option, index) => {
+          if (typeof option === "string") {
+            return { label: labels[index] || `${index + 1}`, text: option };
+          }
+          const label = (option?.label || labels[index] || `${index + 1}`).toString().trim();
+          const text = (option?.text || option?.option || option?.answer || "").toString().trim();
+          if (!text) return null;
+          return { label, text };
+        })
+        .filter(Boolean);
+    }
+
+    function formatQuizForHistory(quiz) {
+      const optionText = quiz.options
+        .map((option) => `${option.label}) ${option.text}`)
+        .join("\n");
+      return `${quiz.question}\n\n${optionText}`;
+    }
+
+    function renderQuizQuestion({ contentEl, ttsButton, quiz }) {
+      contentEl.innerHTML = formatMessage(quiz.question);
+      setTtsButtonText(ttsButton, quiz.question);
+      const optionsContainer = document.createElement("div");
+      optionsContainer.className = "mt-3 flex flex-wrap gap-2";
+      quiz.options.forEach((option) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className =
+          "followup-button inline-flex items-center gap-2 rounded-full bg-[#0052C4] px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#1a73e8]";
+        button.textContent = `${option.label}. ${option.text}`;
+        button.addEventListener("click", () => {
+          const optionList = quiz.options
+            .map((item) => `${item.label}) ${item.text}`)
+            .join("\n");
+          const answerPrompt = `Quiz question:\n${quiz.question}\n\nOptions:\n${optionList}\n\nSelected answer: ${option.label}) ${option.text}\n\nTell me if this is correct and explain why.`;
+          handleUserMessage(answerPrompt);
+        });
+        optionsContainer.appendChild(button);
+      });
+      contentEl.appendChild(optionsContainer);
+    }
+
+    async function requestQuizFromModel() {
+      clearFollowupSuggestions();
+      const quizPrompt = `Create a multiple-choice question based on our conversation so far.
+Return ONLY JSON between the markers exactly as shown:
+<<<QUIZ>>>
+{"question":"...","options":[{"label":"A","text":"..."},{"label":"B","text":"..."},{"label":"C","text":"..."},{"label":"D","text":"..."}]}
+<<<END_QUIZ>>>
+Do not include the correct answer or any extra text.`;
+      const { contentEl, ttsButton } = addBotMessage("Generating a quiz...");
+      setTyping(true);
+      awaitingResponse = true;
+      if (speechMode === SpeechMode.CONTINUOUS) {
+        pauseRecognitionForResponse();
+      }
+
+      try {
+        const quizMessages = [...messages, { role: "user", content: quizPrompt }];
+        const { assistantText } = await streamAssistantResponseInto({
+          messagesToSend: quizMessages,
+          contentEl,
+          ttsButton,
+          expectFollowups: false,
+          renderWhileStreaming: false,
+        });
+        const parsed = extractQuizFromContent(assistantText || "");
+        const normalizedOptions = parsed ? normalizeQuizOptions(parsed.options) : [];
+        if (!parsed || !normalizedOptions.length) {
+          const fallbackText =
+            "Sorry, I couldn't generate a quiz just now. Please try again.";
+          contentEl.innerHTML = formatMessage(fallbackText);
+          setTtsButtonText(ttsButton, fallbackText);
+          return;
+        }
+        const quiz = { question: parsed.question, options: normalizedOptions };
+        renderQuizQuestion({ contentEl, ttsButton, quiz });
+        messages.push({ role: "user", content: quizPrompt });
+        const historyText = formatQuizForHistory(quiz);
+        messages.push({ role: "assistant", content: historyText });
+        logToFirebase("assistant", historyText);
+      } catch (err) {
+        console.error(err);
+        errorSpan.textContent = "Network error connecting to backend.";
+      } finally {
+        awaitingResponse = false;
+        setTyping(false);
+        if (speechMode === SpeechMode.PUSH_TO_TALK) {
+          stopListening();
+        } else if (speechMode === SpeechMode.CONTINUOUS) {
+          resumeRecognitionAfterResponse();
+        }
+      }
+    }
+
     function renderFollowupSuggestions(container, suggestions) {
       clearFollowupSuggestions();
       if (!container) return;
@@ -3154,8 +3281,6 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
         {
           type: "quiz",
           text: "Quiz Me",
-          prompt:
-            "Create a multiple-choice question based on our conversation so far. Provide four options labeled A-D and indicate the correct answer.",
         },
       ];
       fixedSuggestions.forEach((suggestion) => {
@@ -3166,6 +3291,10 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
         button.textContent = suggestion.text;
         button.addEventListener("click", () => {
           clearFollowupSuggestions();
+          if (suggestion.type === "quiz") {
+            requestQuizFromModel();
+            return;
+          }
           handleUserMessage(suggestion.prompt);
         });
         container.appendChild(button);
