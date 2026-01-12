@@ -3383,7 +3383,7 @@ Do not include the correct answer or any extra text.`;
           messagesToSend: narrativeMessages,
           contentEl,
           ttsButton: button,
-          expectFollowups: false,
+          expectFollowups: true,
         });
         if (assistantText) {
           await playTtsForText(assistantText, button, contentEl);
