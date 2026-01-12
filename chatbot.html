@@ -388,10 +388,13 @@
       <img src="./ross pic.png" class="w-10 h-10 rounded-full object-cover border border-slate-200 flex-none self-end mb-1" alt="Bot">
       <div class="space-y-1 max-w-[85%]">
         <div class="text-xs text-slate-500 ml-1">Ro(bot)ss Clark</div>
-        <div class="msg-bot bg-white border border-slate-200 p-4 text-sm leading-relaxed shadow-sm text-slate-800" data-role="bot-content">
-          <p>Hello! I'm your AI assistant for <span class="text-[#0052C4] font-semibold">SPX102 INTRODUCTION TO COACHING</span>.</p>
-          <br>
-          <p>I can help you understand coaching pedagogy, training principles and other aspects of your course. What should we discuss?</p>
+        <div class="msg-bot bg-white border border-slate-200 p-4 text-sm leading-relaxed shadow-sm text-slate-800">
+          <div data-role="bot-content">
+            <p>Hello! I'm your AI assistant for <span class="text-[#0052C4] font-semibold">SPX102 INTRODUCTION TO COACHING</span>.</p>
+            <br>
+            <p>I can help you understand coaching pedagogy, training principles and other aspects of your course. What should we discuss?</p>
+          </div>
+          <div data-role="followup-container" class="mt-3 flex flex-wrap gap-2 hidden"></div>
         </div>
         <div class="mt-2 flex items-center gap-2 text-xs text-slate-500">
           <button type="button" class="copy-button inline-flex h-8 w-8 items-center justify-center rounded-full shadow-sm" data-role="copy-button" aria-label="Copy message text" title="Copy text">
@@ -2093,6 +2096,20 @@ You MUST follow these rules exactly:
    - Use clear, concise explanations. Your responses should not exceeed 400 tokens unless absolutely necessary. 
    - When explaining difficult concepts, use simple examples aimed at university students.
    - When describing workflows, display the steps as a vertical list with emoji bullet points. Use bold headers for the action on each bullet, followed by details. Put "Tools" and "Why" on separate lines under the header.
+   - If you provide follow-up prompts, they must be answerable using the knowledge base and aligned with the course content.
+
+4. FOLLOW-UP PROMPTS (REQUIRED)
+   - Always include at least one follow-up prompt.
+   - Provide up to three prompts, in this order when appropriate:
+     1) Socratic tutor question
+     2) Request for a specific example
+     3) Lucky dip: short story or poem
+   - If a type is not appropriate, omit it. Ensure at least one prompt remains.
+   - When you include follow-ups, append them AFTER the main answer as a JSON array between the markers:
+     <<<FOLLOWUPS>>>
+     [{"type":"socratic","text":"..."},{"type":"example","text":"..."},{"type":"lucky_dip","text":"Lucky dip - short story or poem"}]
+     <<<END_FOLLOWUPS>>>
+   - If no follow-ups, omit the markers entirely.
 
 KNOWLEDGE BASE (sole source of truth):
 ${knowledgeBase}
@@ -2254,7 +2271,10 @@ ${knowledgeBase}
       const entries = [];
       chatLog.querySelectorAll(".msg-user, .msg-bot").forEach((node) => {
         const role = node.classList.contains("msg-user") ? "You" : "Coach Ross";
-        const content = node.innerHTML.trim();
+        const contentNode = node.classList.contains("msg-user")
+          ? node
+          : node.querySelector("[data-role='bot-content']");
+        const content = contentNode?.innerHTML.trim() || "";
         if (content) {
           entries.push({ role, content });
         }
@@ -2336,8 +2356,9 @@ ${knowledgeBase}
             <div class="space-y-1 max-w-[85%]">
                 <div class="text-xs text-slate-500 ml-1">Ross Clark</div>
                 <div class="flex items-start gap-2">
-                  <div class="msg-bot bg-white border border-slate-200 p-4 text-sm leading-relaxed shadow-sm text-slate-800" data-role="bot-content">
-                      ${formatMessage(content)}
+                  <div class="msg-bot bg-white border border-slate-200 p-4 text-sm leading-relaxed shadow-sm text-slate-800">
+                      <div data-role="bot-content">${formatMessage(content)}</div>
+                      <div data-role="followup-container" class="mt-3 flex flex-wrap gap-2 hidden"></div>
                   </div>
                   <button
                     type="button"
@@ -2362,11 +2383,12 @@ ${knowledgeBase}
         const contentEl = div.querySelector("[data-role='bot-content']");
         const ttsButton = div.querySelector("[data-role='tts-button']");
         const copyButton = div.querySelector("[data-role='copy-button']");
+        const followupContainer = div.querySelector("[data-role='followup-container']");
         ttsButton.addEventListener("click", () => handleTtsButtonClick(ttsButton));
         wireCopyButton(copyButton, contentEl);
         lucide.createIcons();
         scrollMessageToTop(contentEl);
-        return { contentEl, ttsButton };
+        return { contentEl, ttsButton, followupContainer };
     }
 
     function setCopyButtonState(button, state) {
@@ -2917,7 +2939,51 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
       <br><br>You do not have to go through this alone.`;
     }
 
-    async function streamAssistantResponseInto({ messagesToSend, contentEl, ttsButton }) {
+    function normalizeFollowupText(text) {
+      return text.trim().toLowerCase();
+    }
+
+    function getVisibleAssistantContent(rawText) {
+      const delimiterIndex = rawText.indexOf("<<<FOLLOWUPS>>>");
+      if (delimiterIndex === -1) {
+        return rawText;
+      }
+      return rawText.slice(0, delimiterIndex).trimEnd();
+    }
+
+    function extractFollowupsFromContent(rawText) {
+      const startToken = "<<<FOLLOWUPS>>>";
+      const endToken = "<<<END_FOLLOWUPS>>>";
+      const startIndex = rawText.indexOf(startToken);
+      if (startIndex === -1) {
+        return { mainText: rawText.trim(), followups: [] };
+      }
+      const endIndex = rawText.indexOf(endToken, startIndex + startToken.length);
+      if (endIndex === -1) {
+        return { mainText: rawText.slice(0, startIndex).trim(), followups: [] };
+      }
+      const jsonBlock = rawText
+        .slice(startIndex + startToken.length, endIndex)
+        .trim()
+        .replace(/^```(?:json)?/i, "")
+        .replace(/```$/i, "")
+        .trim();
+      let parsed = [];
+      try {
+        parsed = JSON.parse(jsonBlock);
+      } catch (err) {
+        parsed = [];
+      }
+      const mainText = rawText.slice(0, startIndex).trim();
+      return { mainText, followups: Array.isArray(parsed) ? parsed : [] };
+    }
+
+    async function streamAssistantResponseInto({
+      messagesToSend,
+      contentEl,
+      ttsButton,
+      expectFollowups = true,
+    }) {
       const decoder = new TextDecoder();
       let assistantContent = "";
       let buffer = "";
@@ -2967,7 +3033,7 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
         const fallbackText = "Sorry, I couldn't generate a response just now.";
         contentEl.innerHTML = formatMessage(fallbackText);
         setTtsButtonText(ttsButton, fallbackText);
-        return assistantContent;
+        return { assistantText: fallbackText, followups: [] };
       }
 
       const reader = response.body?.getReader();
@@ -3011,7 +3077,10 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
             const delta = parsed?.choices?.[0]?.delta?.content || "";
             if (delta) {
               assistantContent += delta;
-              contentEl.innerHTML = formatMessage(assistantContent);
+              const visibleContent = expectFollowups
+                ? getVisibleAssistantContent(assistantContent)
+                : assistantContent;
+              contentEl.innerHTML = formatMessage(visibleContent);
             }
 
             const finishReason = parsed?.choices?.[0]?.finish_reason;
@@ -3025,24 +3094,82 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
         }
       }
 
-      if (assistantContent) {
-        setTtsButtonText(ttsButton, assistantContent);
+      const { mainText, followups } = expectFollowups
+        ? extractFollowupsFromContent(assistantContent)
+        : { mainText: assistantContent.trim(), followups: [] };
+      if (mainText) {
+        contentEl.innerHTML = formatMessage(mainText);
+        setTtsButtonText(ttsButton, mainText);
       }
-      return assistantContent;
+      return { assistantText: mainText, followups };
     }
 
     async function streamAssistantResponse() {
-      const { contentEl: botContentEl, ttsButton } = addBotMessage("");
+      const { contentEl: botContentEl, ttsButton, followupContainer } = addBotMessage("");
       ttsButton.dataset.userPrompt = lastUserPrompt;
-      const assistantReply = await streamAssistantResponseInto({
+      const { assistantText, followups } = await streamAssistantResponseInto({
         messagesToSend: messages,
         contentEl: botContentEl,
         ttsButton,
       });
-      if (assistantReply && autoTtsEnabled) {
-        await playTtsForText(assistantReply, ttsButton, botContentEl);
+      if (assistantText && autoTtsEnabled) {
+        await playTtsForText(assistantText, ttsButton, botContentEl);
       }
-      return assistantReply;
+      return { assistantReply: assistantText, followups, followupContainer };
+    }
+
+    function clearFollowupSuggestions() {
+      document.querySelectorAll("[data-role='followup-container']").forEach((container) => {
+        container.innerHTML = "";
+        container.classList.add("hidden");
+      });
+    }
+
+    function renderFollowupSuggestions(container, suggestions) {
+      clearFollowupSuggestions();
+      if (!container) return;
+      const order = ["socratic", "example"];
+      const seenInResponse = new Set();
+      const filteredSuggestions = order
+        .map((type) => suggestions.find((item) => item?.type === type))
+        .filter(Boolean)
+        .filter((item) => {
+          if (!item?.text) return false;
+          const normalized = normalizeFollowupText(item.text);
+          if (seenInResponse.has(normalized)) return false;
+          seenInResponse.add(normalized);
+          return true;
+        })
+        .slice(0, 2);
+      if (!filteredSuggestions.length) {
+        const fallbackText = `What's the most important takeaway from that answer?`;
+        filteredSuggestions.push({ type: "socratic", text: fallbackText });
+      }
+      const luckyDipSuggestion = suggestions.find((item) => item?.type === "lucky_dip");
+      const luckyDipText = luckyDipSuggestion?.text || "Lucky dip - short story or poem";
+      filteredSuggestions.push({ type: "lucky_dip", text: luckyDipText });
+      if (!filteredSuggestions.length) return;
+      filteredSuggestions.forEach((suggestion) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className =
+          "followup-button inline-flex items-center gap-2 rounded-full bg-[#0052C4] px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#1a73e8]";
+        button.textContent = suggestion.text;
+        button.addEventListener("click", () => {
+          clearFollowupSuggestions();
+          const luckyDipPrompts = [
+            "Generate a short story based on the SPX102 coaching notes and our conversation so far.",
+            "Generate a poem based on the SPX102 coaching notes and our conversation so far.",
+          ];
+          const nextPrompt =
+            suggestion.type === "lucky_dip"
+              ? luckyDipPrompts[Math.floor(Math.random() * luckyDipPrompts.length)]
+              : suggestion.text;
+          handleUserMessage(nextPrompt);
+        });
+        container.appendChild(button);
+      });
+      container.classList.remove("hidden");
     }
 
     async function handleNarrativeModeRequest({ button, contentEl }) {
@@ -3075,13 +3202,14 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
       ];
 
       try {
-        const assistantReply = await streamAssistantResponseInto({
+        const { assistantText } = await streamAssistantResponseInto({
           messagesToSend: narrativeMessages,
           contentEl,
           ttsButton: button,
+          expectFollowups: false,
         });
-        if (assistantReply) {
-          await playTtsForText(assistantReply, button, contentEl);
+        if (assistantText) {
+          await playTtsForText(assistantText, button, contentEl);
         } else if (originalText) {
           contentEl.innerHTML = formatMessage(originalText);
           setTtsButtonText(button, originalText);
@@ -3287,6 +3415,7 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
     // Unified user message handler (text or speech)
     async function handleUserMessage(userText, { triggeredBySpeech = false } = {}) {
       errorSpan.textContent = "";
+      clearFollowupSuggestions();
       const cleanedText = userText.trim();
       const hasPdf = Boolean(pdfAttachment);
       if (!cleanedText && !hasPdf) return;
@@ -3294,10 +3423,12 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
       lastUserPrompt = fallbackPrompt;
       const narrativeUserInstruction =
         "You must respond in narrative format with no tables or bullet points.";
+      const followupInstruction =
+        "Append at least one follow-up prompt after your answer exactly as specified in the system instructions.";
 
       const focusPrefix = pendingFocusInstruction ? `${pendingFocusInstruction}. ` : "";
       const narrativePrefix = narrativeModeEnabled ? `${narrativeUserInstruction} ` : "";
-      const messageToSend = `${focusPrefix}${narrativePrefix}${fallbackPrompt}`.trim();
+      const messageToSend = `${focusPrefix}${narrativePrefix}${fallbackPrompt}\n\n${followupInstruction}`.trim();
       pendingFocusInstruction = "";
 
       const userLogText = cleanedText || "PDF attached.";
@@ -3353,10 +3484,11 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
 
       // Backend Call with streaming
       try {
-        const assistantReply = await streamAssistantResponse();
+        const { assistantReply, followups, followupContainer } = await streamAssistantResponse();
         if (assistantReply) {
           messages.push({ role: "assistant", content: assistantReply });
           logToFirebase("assistant", assistantReply);
+          renderFollowupSuggestions(followupContainer, followups);
         }
       } catch (err) {
         console.error(err);
