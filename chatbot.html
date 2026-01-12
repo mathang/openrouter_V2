@@ -522,6 +522,18 @@
     let lastUserPrompt = "";
     let narrativeModeEnabled = false;
     let narrativeModeInFlight = false;
+    let tutorModeEnabled = false;
+    const tutorModeSystemInstruction = `You are a Socratic tutor. Your goal is to guide me to understand the topic we are discussing.
+Do not give me direct answers. Instead, ask probing, open-ended questions one at a time.
+Wait for my response before asking the next question.
+Help me identify gaps in my reasoning, challenge assumptions, and build my own understanding.
+Continue until I can explain the concept back to you.
+
+Start by asking me what I already know about the topic we are discussing.`;
+    const tutorModeExitInstruction =
+      "Exit Socratic tutor mode and respond in the default helpful assistant style with direct answers.";
+    const tutorModeExitPrompt =
+      "I’m done with the Socratic tutor mode exercise. Please just explain the concept to me plainly now.";
     const ttsSpeedOptions = [1, 1.5, 2];
     let ttsSpeed = 1;
     let ttsEngine = "huggingface";
@@ -2132,7 +2144,9 @@ ${knowledgeBase}
         .replace(/\s{2,}/g, " ");
       const escaped = escapeHtml(cleaned);
       const bolded = escaped.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-      return bolded.replace(/_(.*?)_/g, "<em>$1</em>");
+      const italicized = bolded.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+      const emphasized = italicized.replace(/_(.*?)_/g, "<em>$1</em>");
+      return emphasized.replace(/\*/g, "");
     }
 
     function renderTable(lines, startIndex) {
@@ -2944,11 +2958,24 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
     }
 
     function getVisibleAssistantContent(rawText) {
-      const delimiterIndex = rawText.indexOf("<<<FOLLOWUPS>>>");
-      if (delimiterIndex === -1) {
+      const startToken = "<<<FOLLOWUPS>>>";
+      const endToken = "<<<END_FOLLOWUPS>>>";
+      const startIndex = rawText.indexOf(startToken);
+      const endIndex = rawText.indexOf(endToken);
+      let cutIndex = -1;
+
+      if (startIndex !== -1 && endIndex !== -1) {
+        cutIndex = Math.min(startIndex, endIndex);
+      } else if (startIndex !== -1) {
+        cutIndex = startIndex;
+      } else if (endIndex !== -1) {
+        cutIndex = endIndex;
+      }
+
+      if (cutIndex === -1) {
         return rawText;
       }
-      return rawText.slice(0, delimiterIndex).trimEnd();
+      return rawText.slice(0, cutIndex).trimEnd();
     }
 
     function extractFollowupsFromContent(rawText) {
@@ -2956,6 +2983,10 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
       const endToken = "<<<END_FOLLOWUPS>>>";
       const startIndex = rawText.indexOf(startToken);
       if (startIndex === -1) {
+        const endIndex = rawText.indexOf(endToken);
+        if (endIndex !== -1) {
+          return { mainText: rawText.slice(0, endIndex).trim(), followups: [] };
+        }
         return { mainText: rawText.trim(), followups: [] };
       }
       const endIndex = rawText.indexOf(endToken, startIndex + startToken.length);
@@ -2983,6 +3014,7 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
       contentEl,
       ttsButton,
       expectFollowups = true,
+      renderWhileStreaming = true,
     }) {
       const decoder = new TextDecoder();
       let assistantContent = "";
@@ -3077,10 +3109,12 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
             const delta = parsed?.choices?.[0]?.delta?.content || "";
             if (delta) {
               assistantContent += delta;
-              const visibleContent = expectFollowups
-                ? getVisibleAssistantContent(assistantContent)
-                : assistantContent;
-              contentEl.innerHTML = formatMessage(visibleContent);
+              if (renderWhileStreaming) {
+                const visibleContent = expectFollowups
+                  ? getVisibleAssistantContent(assistantContent)
+                  : assistantContent;
+                contentEl.innerHTML = formatMessage(visibleContent);
+              }
             }
 
             const finishReason = parsed?.choices?.[0]?.finish_reason;
@@ -3125,31 +3159,179 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
       });
     }
 
+    function extractQuizFromContent(rawText) {
+      const startToken = "<<<QUIZ>>>";
+      const endToken = "<<<END_QUIZ>>>";
+      let jsonBlock = rawText.trim();
+      const startIndex = rawText.indexOf(startToken);
+      if (startIndex !== -1) {
+        const endIndex = rawText.indexOf(endToken, startIndex + startToken.length);
+        if (endIndex === -1) return null;
+        jsonBlock = rawText
+          .slice(startIndex + startToken.length, endIndex)
+          .trim()
+          .replace(/^```(?:json)?/i, "")
+          .replace(/```$/i, "")
+          .trim();
+      }
+      try {
+        const parsed = JSON.parse(jsonBlock);
+        const question = parsed?.question?.trim();
+        const options = Array.isArray(parsed?.options) ? parsed.options : [];
+        if (!question || !options.length) return null;
+        return { question, options };
+      } catch (err) {
+        return null;
+      }
+    }
+
+    function normalizeQuizOptions(options) {
+      const labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+      return options
+        .map((option, index) => {
+          if (typeof option === "string") {
+            return { label: labels[index] || `${index + 1}`, text: option };
+          }
+          const label = (option?.label || labels[index] || `${index + 1}`).toString().trim();
+          const text = (option?.text || option?.option || option?.answer || "").toString().trim();
+          if (!text) return null;
+          return { label, text };
+        })
+        .filter(Boolean);
+    }
+
+    function formatQuizForHistory(quiz) {
+      const optionText = quiz.options
+        .map((option) => `${option.label}) ${option.text}`)
+        .join("\n");
+      return `${quiz.question}\n\n${optionText}`;
+    }
+
+    function renderQuizQuestion({ contentEl, ttsButton, quiz }) {
+      contentEl.innerHTML = formatMessage(quiz.question);
+      setTtsButtonText(ttsButton, quiz.question);
+      const optionsContainer = document.createElement("div");
+      optionsContainer.className = "mt-3 flex flex-wrap gap-2";
+      quiz.options.forEach((option) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className =
+          "followup-button inline-flex items-center gap-2 rounded-full bg-[#0052C4] px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#1a73e8]";
+        button.textContent = `${option.label}. ${option.text}`;
+        button.addEventListener("click", () => {
+          const optionList = quiz.options
+            .map((item) => `${item.label}) ${item.text}`)
+            .join("\n");
+          const answerPrompt = `Quiz question:\n${quiz.question}\n\nOptions:\n${optionList}\n\nSelected answer: ${option.label}) ${option.text}\n\nTell me if this is correct and explain why.`;
+          handleUserMessage(answerPrompt);
+        });
+        optionsContainer.appendChild(button);
+      });
+      contentEl.appendChild(optionsContainer);
+    }
+
+    function exitTutorMode() {
+      if (!tutorModeEnabled) return;
+      tutorModeEnabled = false;
+      clearFollowupSuggestions();
+      messages.push({ role: "system", content: tutorModeExitInstruction });
+      handleUserMessage(tutorModeExitPrompt);
+    }
+
+    function startTutorMode() {
+      if (tutorModeEnabled) return;
+      tutorModeEnabled = true;
+      messages.push({ role: "system", content: tutorModeSystemInstruction });
+      const kickoffPrompt =
+        "Start the Socratic tutoring now based on the topic we are discussing.";
+      handleUserMessage(kickoffPrompt);
+    }
+
+    async function requestQuizFromModel() {
+      clearFollowupSuggestions();
+      const quizPrompt = `Create a multiple-choice question based on our conversation so far.
+Return ONLY JSON between the markers exactly as shown:
+<<<QUIZ>>>
+{"question":"...","options":[{"label":"A","text":"..."},{"label":"B","text":"..."},{"label":"C","text":"..."},{"label":"D","text":"..."}]}
+<<<END_QUIZ>>>
+Do not include the correct answer or any extra text.`;
+      const { contentEl, ttsButton } = addBotMessage("Generating a quiz...");
+      setTyping(true);
+      awaitingResponse = true;
+      if (speechMode === SpeechMode.CONTINUOUS) {
+        pauseRecognitionForResponse();
+      }
+
+      try {
+        const quizMessages = [...messages, { role: "user", content: quizPrompt }];
+        const { assistantText } = await streamAssistantResponseInto({
+          messagesToSend: quizMessages,
+          contentEl,
+          ttsButton,
+          expectFollowups: false,
+          renderWhileStreaming: false,
+        });
+        const parsed = extractQuizFromContent(assistantText || "");
+        const normalizedOptions = parsed ? normalizeQuizOptions(parsed.options) : [];
+        if (!parsed || !normalizedOptions.length) {
+          const fallbackText =
+            "Sorry, I couldn't generate a quiz just now. Please try again.";
+          contentEl.innerHTML = formatMessage(fallbackText);
+          setTtsButtonText(ttsButton, fallbackText);
+          return;
+        }
+        const quiz = { question: parsed.question, options: normalizedOptions };
+        renderQuizQuestion({ contentEl, ttsButton, quiz });
+        messages.push({ role: "user", content: quizPrompt });
+        const historyText = formatQuizForHistory(quiz);
+        messages.push({ role: "assistant", content: historyText });
+        logToFirebase("assistant", historyText);
+      } catch (err) {
+        console.error(err);
+        errorSpan.textContent = "Network error connecting to backend.";
+      } finally {
+        awaitingResponse = false;
+        setTyping(false);
+        if (speechMode === SpeechMode.PUSH_TO_TALK) {
+          stopListening();
+        } else if (speechMode === SpeechMode.CONTINUOUS) {
+          resumeRecognitionAfterResponse();
+        }
+      }
+    }
+
     function renderFollowupSuggestions(container, suggestions) {
       clearFollowupSuggestions();
       if (!container) return;
-      const order = ["socratic", "example"];
-      const seenInResponse = new Set();
-      const filteredSuggestions = order
-        .map((type) => suggestions.find((item) => item?.type === type))
-        .filter(Boolean)
-        .filter((item) => {
-          if (!item?.text) return false;
-          const normalized = normalizeFollowupText(item.text);
-          if (seenInResponse.has(normalized)) return false;
-          seenInResponse.add(normalized);
-          return true;
-        })
-        .slice(0, 2);
-      if (!filteredSuggestions.length) {
-        const fallbackText = `What's the most important takeaway from that answer?`;
-        filteredSuggestions.push({ type: "socratic", text: fallbackText });
+      if (tutorModeEnabled) {
+        const exitButton = document.createElement("button");
+        exitButton.type = "button";
+        exitButton.className =
+          "followup-button inline-flex items-center gap-2 rounded-full bg-[#0052C4] px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#1a73e8]";
+        exitButton.textContent = "Exit Tutor Mode";
+        exitButton.addEventListener("click", () => {
+          exitTutorMode();
+        });
+        container.appendChild(exitButton);
+        container.classList.remove("hidden");
+        return;
       }
-      const luckyDipSuggestion = suggestions.find((item) => item?.type === "lucky_dip");
-      const luckyDipText = luckyDipSuggestion?.text || "Lucky dip - short story or poem";
-      filteredSuggestions.push({ type: "lucky_dip", text: luckyDipText });
-      if (!filteredSuggestions.length) return;
-      filteredSuggestions.forEach((suggestion) => {
+      const fixedSuggestions = [
+        {
+          type: "example",
+          text: "Provide an Example",
+          prompt: "Provide a specific example related to your last response.",
+        },
+        {
+          type: "quiz",
+          text: "Quiz Me",
+        },
+        {
+          type: "tutor",
+          text: "Tutor Me",
+        },
+      ];
+      fixedSuggestions.forEach((suggestion) => {
         const button = document.createElement("button");
         button.type = "button";
         button.className =
@@ -3157,15 +3339,15 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
         button.textContent = suggestion.text;
         button.addEventListener("click", () => {
           clearFollowupSuggestions();
-          const luckyDipPrompts = [
-            "Generate a short story based on the SPX102 coaching notes and our conversation so far.",
-            "Generate a poem based on the SPX102 coaching notes and our conversation so far.",
-          ];
-          const nextPrompt =
-            suggestion.type === "lucky_dip"
-              ? luckyDipPrompts[Math.floor(Math.random() * luckyDipPrompts.length)]
-              : suggestion.text;
-          handleUserMessage(nextPrompt);
+          if (suggestion.type === "quiz") {
+            requestQuizFromModel();
+            return;
+          }
+          if (suggestion.type === "tutor") {
+            startTutorMode();
+            return;
+          }
+          handleUserMessage(suggestion.prompt);
         });
         container.appendChild(button);
       });
@@ -3206,7 +3388,7 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
           messagesToSend: narrativeMessages,
           contentEl,
           ttsButton: button,
-          expectFollowups: false,
+          expectFollowups: true,
         });
         if (assistantText) {
           await playTtsForText(assistantText, button, contentEl);
