@@ -2472,7 +2472,7 @@ ${knowledgeBase}
                     </button>
                     <button
                       type="button"
-                      class="video-toggle-button h-9 w-9 rounded-full flex items-center justify-center shadow-sm hidden"
+                      class="video-toggle-button h-9 w-9 rounded-full flex items-center justify-center shadow-sm"
                       data-role="video-toggle"
                       data-state="inactive"
                       aria-label="Show related video"
@@ -3186,14 +3186,11 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
         );
         if (!container) return;
         const hasVideo = container.dataset.hasVideo === "true";
+        setVideoToggleState(toggle, showVideosEnabled);
         if (!hasVideo) {
           container.classList.add("hidden");
-          toggle.classList.add("hidden");
-          setVideoToggleState(toggle, false);
           return;
         }
-        toggle.classList.remove("hidden");
-        setVideoToggleState(toggle, showVideosEnabled);
         if (showVideosEnabled) {
           container.classList.remove("hidden");
         } else {
@@ -3204,23 +3201,22 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
 
     function renderVideoRecommendation({ video, videoContainer, videoToggle }) {
       if (!videoContainer || !videoToggle) return;
+      videoToggle.onclick = () => {
+        showVideosEnabled = !showVideosEnabled;
+        updateAllVideoVisibility();
+        if (showVideosEnabled && videoContainer.dataset.hasVideo === "true") {
+          scrollMessageToTop(videoContainer);
+        }
+      };
       if (!video) {
         videoContainer.innerHTML = "";
         videoContainer.dataset.hasVideo = "false";
         updateAllVideoVisibility();
-        videoToggle.onclick = null;
         return;
       }
       videoContainer.innerHTML = buildVideoEmbed(video);
       videoContainer.dataset.hasVideo = "true";
       updateAllVideoVisibility();
-      videoToggle.onclick = () => {
-        showVideosEnabled = !showVideosEnabled;
-        updateAllVideoVisibility();
-        if (showVideosEnabled) {
-          scrollMessageToTop(videoContainer);
-        }
-      };
     }
 
     async function streamAssistantResponseInto({
