@@ -521,25 +521,23 @@
     };
     const videoLibrary = [
       {
-        id: "course-intro",
-        title: "Course Welcome & Assessment Overview",
-        youtubeId: "dQw4w9WgXcQ",
-        keywords: ["welcome", "overview", "assessment", "textbook", "attendance", "admin"],
+        id: "ltad-video",
+        title: "LTAD Overview",
+        youtubeId: "mfIVdp4YFGI",
+        startSeconds: 24,
+        watchUrl: "https://youtu.be/mfIVdp4YFGI?si=JQhZvuAMfG27XIvj&t=24",
+        keywords: ["ltad"],
       },
       {
-        id: "ltad-periodisation",
-        title: "Long-Term Athlete Development & Periodisation",
-        youtubeId: "aqz-KE-bpKQ",
-        keywords: ["ltad", "periodisation", "long-term", "development", "planning", "training plan"],
-      },
-      {
-        id: "para-athletes-coaching",
-        title: "Coaching Older Athletes & Para-Athletes",
-        youtubeId: "mP0VHJYFOAU",
-        keywords: ["older athletes", "ageing", "para-athletes", "disability", "inclusive", "wheelchair"],
+        id: "feedback-video",
+        title: "Feedback in Coaching",
+        youtubeId: "mfIVdp4YFGI",
+        startSeconds: 345,
+        watchUrl: "https://youtu.be/mfIVdp4YFGI?si=h5DZ2J8HPbLb7qw3&t=345",
+        keywords: ["feedback"],
       },
     ];
-    const videoMatchThreshold = 2;
+    const videoMatchThreshold = 1;
     const HF_TTS_VOICES = {
       female: "af_heart",
       male: "am_fenrir",
@@ -577,6 +575,8 @@
     let narrativeModeEnabled = false;
     let narrativeModeInFlight = false;
     let tutorModeEnabled = false;
+    let showVideosEnabled = true;
+    let videoMessageCounter = 0;
     const tutorModeSystemInstruction = `You are a Socratic tutor. Your goal is to guide me to understand the topic we are discussing.
 Do not give me direct answers. Instead, ask probing, open-ended questions one at a time.
 Wait for my response before asking the next question.
@@ -2496,6 +2496,9 @@ ${knowledgeBase}
         const followupContainer = div.querySelector("[data-role='followup-container']");
         const videoContainer = div.querySelector("[data-role='video-container']");
         const videoToggle = div.querySelector("[data-role='video-toggle']");
+        const videoId = `video-${videoMessageCounter++}`;
+        videoContainer.dataset.videoId = videoId;
+        videoToggle.dataset.videoTarget = videoId;
         ttsButton.addEventListener("click", () => handleTtsButtonClick(ttsButton));
         wireCopyButton(copyButton, contentEl);
         lucide.createIcons();
@@ -3152,8 +3155,9 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
 
     function buildVideoEmbed(video) {
       if (!video) return "";
-      const youtubeUrl = `https://www.youtube.com/watch?v=${video.youtubeId}`;
-      const embedUrl = `https://www.youtube-nocookie.com/embed/${video.youtubeId}`;
+      const youtubeUrl = video.watchUrl || `https://www.youtube.com/watch?v=${video.youtubeId}`;
+      const startParam = video.startSeconds ? `?start=${video.startSeconds}` : "";
+      const embedUrl = `https://www.youtube-nocookie.com/embed/${video.youtubeId}${startParam}`;
       return `
         <div class="space-y-2">
           <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Related video</div>
@@ -3173,25 +3177,47 @@ function playAudioFromBlob(blob, button, contentEl, sentenceMetadata, playbackTo
       `;
     }
 
+    function updateAllVideoVisibility() {
+      document.querySelectorAll("[data-role='video-toggle']").forEach((toggle) => {
+        const targetId = toggle.dataset.videoTarget;
+        if (!targetId) return;
+        const container = document.querySelector(
+          `[data-role='video-container'][data-video-id='${targetId}']`
+        );
+        if (!container) return;
+        const hasVideo = container.dataset.hasVideo === "true";
+        if (!hasVideo) {
+          container.classList.add("hidden");
+          toggle.classList.add("hidden");
+          setVideoToggleState(toggle, false);
+          return;
+        }
+        toggle.classList.remove("hidden");
+        setVideoToggleState(toggle, showVideosEnabled);
+        if (showVideosEnabled) {
+          container.classList.remove("hidden");
+        } else {
+          container.classList.add("hidden");
+        }
+      });
+    }
+
     function renderVideoRecommendation({ video, videoContainer, videoToggle }) {
       if (!videoContainer || !videoToggle) return;
       if (!video) {
         videoContainer.innerHTML = "";
-        videoContainer.classList.add("hidden");
-        videoToggle.classList.add("hidden");
-        setVideoToggleState(videoToggle, false);
+        videoContainer.dataset.hasVideo = "false";
+        updateAllVideoVisibility();
         videoToggle.onclick = null;
         return;
       }
       videoContainer.innerHTML = buildVideoEmbed(video);
-      videoContainer.classList.remove("hidden");
-      videoToggle.classList.remove("hidden");
-      setVideoToggleState(videoToggle, true);
+      videoContainer.dataset.hasVideo = "true";
+      updateAllVideoVisibility();
       videoToggle.onclick = () => {
-        const willShow = videoContainer.classList.contains("hidden");
-        videoContainer.classList.toggle("hidden");
-        setVideoToggleState(videoToggle, willShow);
-        if (willShow) {
+        showVideosEnabled = !showVideosEnabled;
+        updateAllVideoVisibility();
+        if (showVideosEnabled) {
           scrollMessageToTop(videoContainer);
         }
       };
