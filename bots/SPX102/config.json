@@ -1,0 +1,15 @@
+{
+  "id": "SPX102",
+  "title": "SPX102 Coach Ross",
+  "displayName": "Dr. Ross Clark",
+  "shortName": "Ross Clark",
+  "badgeLabel": "AI Coach",
+  "subtitle": "SPX102 Introduction to Coaching \u2022 Always Here for You!",
+  "infoMessage": "I can only answer questions based on the SPX102 Notes.",
+  "welcomeName": "Ro(bot)ss Clark",
+  "welcomeTitle": "SPX102 INTRODUCTION TO COACHING",
+  "welcomeMessage": "I can help you understand coaching pedagogy, training principles and other aspects of your course. What should we discuss?",
+  "noteFooter": "I can only answer questions based on the SPX102 INTRODUCTION TO COACHING notes I was given.",
+  "profileImageUrl": "/ross pic.png",
+  "fallbackAvatarUrl": "https://ui-avatars.com/api/?name=Ross+Clark&background=6366f1&color=fff"
+}
