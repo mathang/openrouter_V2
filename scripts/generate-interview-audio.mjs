@@ -57,3 +57,4 @@ if (result.status !== 0) process.exit(result.status ?? 1);
 
 console.log(`Created ${wavOut}`);
 console.log(`Created ${mp3Out}`);
+// This file is intentionally touched to trigger the workflow after its initial installation.
