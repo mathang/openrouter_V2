@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>NHG–NTU–RRIS Interview Preparation Audio</title>
+  <style>
+    :root{font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;color:#102a43;background:#f4f7fa}
+    body{margin:0;padding:24px}.wrap{max-width:760px;margin:auto;background:white;border-radius:18px;padding:28px;box-shadow:0 12px 36px #102a4320}
+    h1{font-size:clamp(1.7rem,5vw,2.5rem);margin:.1em 0}.sub{color:#486581;line-height:1.55}.status{padding:14px;border-radius:12px;background:#eaf4f8;margin:18px 0;font-weight:650}
+    audio{width:100%;margin:10px 0 18px}.controls{display:flex;gap:10px;flex-wrap:wrap}button,a.button{border:0;border-radius:10px;padding:12px 16px;font-weight:700;cursor:pointer;text-decoration:none;background:#0b7285;color:white}.secondary{background:#d9e2ec!important;color:#102a43!important}
+    ol{padding-left:24px;line-height:1.7}.current{font-weight:800;color:#0b7285}.note{font-size:.92rem;color:#627d98;margin-top:18px}
+  </style>
+</head>
+<body><main class="wrap">
+  <h1>NHG–NTU–RRIS Interview Preparation</h1>
+  <p class="sub">Generated directly through your private Hugging Face Kokoro-TTS Space using the <strong>af_heart</strong> voice. The player moves automatically through all 22 sections.</p>
+  <div id="status" class="status">Preparing Part 1 of 22…</div>
+  <audio id="player" controls preload="auto"></audio>
+  <div class="controls">
+    <button id="prev" class="secondary">Previous</button>
+    <button id="next">Next</button>
+    <button id="restart" class="secondary">Restart</button>
+    <a id="download" class="button" download>Download current WAV</a>
+  </div>
+  <ol id="parts"></ol>
+  <p class="note">The first request may take longer while the Hugging Face Space wakes. Once generated, each section is cached.</p>
+</main>
+<script>
+const TOTAL=22;
+const base='/.netlify/functions/interview-audio-part?voice=af_heart&speed=1.0&part=';
+let index=0;
+const player=document.getElementById('player');
+const status=document.getElementById('status');
+const list=document.getElementById('parts');
+const download=document.getElementById('download');
+for(let i=0;i<TOTAL;i++){
+  const li=document.createElement('li'); li.textContent=`Part ${i+1}`; li.dataset.i=i;
+  li.onclick=()=>load(i,true); list.appendChild(li);
+}
+function mark(){[...list.children].forEach((x,i)=>x.classList.toggle('current',i===index));}
+function load(i,autoplay=false){
+  index=(i+TOTAL)%TOTAL; const url=base+index;
+  status.textContent=`${index===0?'Preparing':'Loading'} Part ${index+1} of ${TOTAL} through Hugging Face Kokoro…`;
+  player.src=url; download.href=url; download.download=`NHG_NTU_RRIS_interview_part_${String(index+1).padStart(2,'0')}.wav`; mark();
+  player.load(); if(autoplay) player.play().catch(()=>{});
+}
+player.addEventListener('canplay',()=>status.textContent=`Playing Part ${index+1} of ${TOTAL} — Kokoro af_heart`);
+player.addEventListener('ended',()=>{if(index<TOTAL-1)load(index+1,true);else status.textContent='Complete — all 22 Kokoro sections played.'});
+player.addEventListener('error',()=>status.textContent=`Part ${index+1} is still waking or generating. Press play again shortly.`);
+document.getElementById('next').onclick=()=>load(index+1,true);
+document.getElementById('prev').onclick=()=>load(index-1,true);
+document.getElementById('restart').onclick=()=>load(0,true);
+load(0,false);
+</script></body></html>
