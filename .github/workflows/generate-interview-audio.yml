@@ -1,0 +1,54 @@
+name: Generate NHG interview Kokoro audio
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/generate-interview-audio.yml"
+      - "scripts/generate-interview-audio.mjs"
+      - "netlify/functions/interview-script.js"
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Generate with private Hugging Face Kokoro Space
+        env:
+          TTS_ENDPOINT: https://openrouterchatbot.netlify.app/.netlify/functions/hf-tts
+        run: node scripts/generate-interview-audio.mjs
+
+      - name: Upload downloadable audio artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NHG-NTU-RRIS-interview-Kokoro-af-heart
+          path: |
+            generated/NHG_NTU_RRIS_interview_preparation_Kokoro_af_heart.mp3
+            generated/NHG_NTU_RRIS_interview_preparation_Kokoro_af_heart.wav
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish audio in repository
+        run: |
+          rm -rf generated/interview-audio-parts
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add generated/NHG_NTU_RRIS_interview_preparation_Kokoro_af_heart.mp3 generated/NHG_NTU_RRIS_interview_preparation_Kokoro_af_heart.wav
+          git commit -m "Generate NHG interview audio with Kokoro af_heart" || exit 0
+          git push
