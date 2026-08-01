@@ -4,3 +4,11 @@
 
 [functions]
   node_bundler = "esbuild"
+
+[functions."bot-config"]
+  included_files = ["bots/**"]
+
+[[redirects]]
+  from = "/*"
+  to = "/chatbot.html"
+  status = 200
